@@ -24,4 +24,6 @@
 bin/
 /hydra
 /testserver
+/hydra-brute
+.env
 

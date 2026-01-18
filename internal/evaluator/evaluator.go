@@ -18,7 +18,6 @@ func NewEvaluator(selector string) *Evaluator {
 }
 
 // Elevate extracts data from the HTML based on the target selector.
-// In this context, "elevation" refers to promoting raw HTML to structured data.
 func (e *Evaluator) Elevate(htmlContent string) (string, error) {
 	doc, err := html.Parse(strings.NewReader(htmlContent))
 	if err != nil {
@@ -28,9 +27,9 @@ func (e *Evaluator) Elevate(htmlContent string) (string, error) {
 	result := ""
 	var f func(*html.Node)
 	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == e.TargetSelector {
-			if n.FirstChild != nil {
-				result = n.FirstChild.Data
+		if n.Type == html.ElementNode {
+			if e.matches(n) {
+				result = e.getText(n)
 				return
 			}
 		}
@@ -48,4 +47,40 @@ func (e *Evaluator) Elevate(htmlContent string) (string, error) {
 	}
 
 	return result, nil
+}
+
+func (e *Evaluator) matches(n *html.Node) bool {
+	selector := e.TargetSelector
+	if strings.HasPrefix(selector, "#") {
+		id := strings.TrimPrefix(selector, "#")
+		for _, attr := range n.Attr {
+			if attr.Key == "id" && attr.Val == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	if strings.HasPrefix(selector, ".") {
+		class := strings.TrimPrefix(selector, ".")
+		for _, attr := range n.Attr {
+			if attr.Key == "class" && strings.Contains(attr.Val, class) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return n.Data == selector
+}
+
+func (e *Evaluator) getText(n *html.Node) string {
+	if n.Type == html.TextNode {
+		return n.Data
+	}
+	var sb strings.Builder
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		sb.WriteString(e.getText(c))
+	}
+	return sb.String()
 }

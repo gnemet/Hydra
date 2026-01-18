@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -20,13 +22,34 @@ func NewFetcher(timeoutSeconds int) *Fetcher {
 	}
 }
 
-func (f *Fetcher) Fetch(url string) (string, error) {
+func (f *Fetcher) Fetch(targetURL string) (string, error) {
+	return f.doRequest("GET", targetURL, nil)
+}
+
+func (f *Fetcher) FetchPost(targetURL string, data map[string]string) (string, error) {
+	return f.doRequest("POST", targetURL, data)
+}
+
+func (f *Fetcher) doRequest(method, targetURL string, data map[string]string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), f.client.Timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	var bodyReader io.Reader
+	if method == "POST" && data != nil {
+		form := url.Values{}
+		for k, v := range data {
+			form.Set(k, v)
+		}
+		bodyReader = strings.NewReader(form.Encode())
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, targetURL, bodyReader)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if method == "POST" {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
 	resp, err := f.client.Do(req)
@@ -34,10 +57,6 @@ func (f *Fetcher) Fetch(url string) (string, error) {
 		return "", fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

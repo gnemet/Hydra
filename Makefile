@@ -2,6 +2,7 @@
 
 HYDRA_BIN=bin/hydra
 SERVER_BIN=bin/testserver
+BRUTE_BIN=bin/hydra-brute
 
 build:
 	mkdir -p bin
@@ -11,7 +12,11 @@ build-server:
 	mkdir -p bin
 	go build -o $(SERVER_BIN) cmd/testserver/main.go
 
-build-all: build build-server
+build-brute:
+	mkdir -p bin
+	go build -o $(BRUTE_BIN) cmd/hydra-brute/main.go
+
+build-all: build build-server build-brute
 
 run: build
 	./$(HYDRA_BIN) configs/config.yaml
@@ -21,6 +26,9 @@ run-test-config: build
 
 run-server: build-server
 	./$(SERVER_BIN)
+
+run-brute: build-brute
+	./$(BRUTE_BIN)
 
 test:
 	go test ./...

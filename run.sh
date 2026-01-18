@@ -28,11 +28,23 @@ sleep 1
 # Ensure the server is killed when the script exits
 trap "echo '🛑 Stopping Test Server...'; kill $SERVER_PID" EXIT
 
-# 4. Run Hydra with test configuration
-echo "🐲 Running Hydra with test_config.yaml..."
-echo "----------------------------------------"
-./bin/hydra configs/test_config.yaml
-echo "----------------------------------------"
+# 4. Mode Selection
+echo "Select mode:"
+echo "1) Single Scrape (configs/test_config.yaml)"
+echo "2) Brute Force Mode (.env + lists)"
+read -p "Selection (1/2): " mode
+
+if [ "$mode" == "2" ]; then
+    echo "🐲 Running Hydra Brute Force..."
+    echo "----------------------------------------"
+    ./bin/hydra-brute
+    echo "----------------------------------------"
+else
+    echo "🐲 Running Hydra Single Scrape..."
+    echo "----------------------------------------"
+    ./bin/hydra configs/test_config.yaml
+    echo "----------------------------------------"
+fi
 
 echo "✅ Hydra execution complete."
 echo "Keep server running? (y/n)"
