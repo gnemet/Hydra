@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hydra Test - Secure Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+</head>
+<body class="dark-theme">
+    <div class="background-overlay"></div>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <main class="login-container">
+        <header class="login-header">
+            <div class="logo">
+                <i class="fas fa-dragon"></i>
+                <h1>HYDRA<span>TEST</span></h1>
+            </div>
+            <p>Enter your credentials to access the secure node.</p>
+        </header>
+
+        <form id="login-form" 
+              hx-post="/login" 
+              hx-target="#response-container" 
+              hx-swap="innerHTML"
+              hx-indicator="#loading">
+            
+            <div class="input-group">
+                <label for="username">Identity</label>
+                <div class="input-wrapper">
+                    <i class="far fa-user"></i>
+                    <input type="text" id="username" name="username" placeholder="Username" required>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label for="password">Access Code</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" name="password" placeholder="••••••••" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+                <span>Engage Authentication</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+
+            <div id="loading" class="htmx-indicator">
+                <div class="spinner"></div>
+                Verifying Credentials...
+            </div>
+        </form>
+
+        <div id="response-container">
+            <!-- Results will appear here -->
+        </div>
+
+        <footer class="login-footer">
+            <button id="theme-toggle" class="btn-icon">
+                <i class="fas fa-moon"></i>
+            </button>
+            <span>v1.0.4-beta</span>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
