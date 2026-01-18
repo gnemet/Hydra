@@ -33,6 +33,7 @@ bin/
 master_passwords.txt
 users.txt
 /temp_lists
+/temp_overdrive
 /hydra_dist/
 /releases/
 
