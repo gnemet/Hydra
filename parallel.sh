@@ -110,7 +110,10 @@ if [ "$SKIP_GEN" = false ]; then
         percent=$(( current_count * 100 / GEN_COUNT ))
         if [ "$percent" -gt 100 ]; then percent=100; fi
         
-        printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$(printf "%$((percent/2))s" | tr ' ' '#')" "$percent" "$current_count" "$GEN_COUNT"
+        # Progress bar
+        bar_len=$((percent / 2))
+        bar=$(printf "%${bar_len}s" | tr " " "#")
+        printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$bar" "$percent" "$current_count" "$GEN_COUNT"
         
         if [ "$still_running" -eq 0 ]; then break; fi
         sleep 0.5
@@ -161,7 +164,7 @@ while true; do
         break
     fi
 
-    tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F: '{sum+=$2} END {print sum+0}')
+    tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F":" "{sum+=\$2} END {print sum+0}")
     if [ "$TOTAL_FOR_BRUTE" -gt 0 ]; then
         percent=$(( tested_count * 100 / TOTAL_FOR_BRUTE ))
     else
@@ -169,7 +172,10 @@ while true; do
     fi
     if [ "$percent" -gt 100 ]; then percent=100; fi
     
-    printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$(printf "%$((percent/2))s" | tr ' ' '#')" "$percent" "$tested_count" "$TOTAL_FOR_BRUTE"
+    # Progress bar
+    bar_len=$((percent / 2))
+    bar=$(printf "%${bar_len}s" | tr " " "#")
+    printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$bar" "$percent" "$tested_count" "$TOTAL_FOR_BRUTE"
     
     if [ "$still_running" -eq 0 ]; then break; fi
     sleep 1
