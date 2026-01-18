@@ -30,7 +30,7 @@ func main() {
 	for i := 0; i < *count; i++ {
 		var password string
 		if *useSet {
-			password, _ = generator.GenerateRandomFromSet(*minBlocks, *maxBlocks)
+			password, _ = generator.GenerateVaried(*minBlocks, *maxBlocks)
 		} else {
 			password, _ = generator.GenerateByBlockPattern(*minBlocks, *maxBlocks)
 		}

@@ -60,8 +60,8 @@ func main() {
 			if strings.Contains(passRegex, "([a-z][A-Z][0-9][_])") {
 				p, _ = generator.GenerateByBlockPattern(6, 10)
 			} else {
-				// Fallback to random characters from the [a-zA-Z0-9_] set with length 6-10
-				p, _ = generator.GenerateRandomFromSet(6, 10)
+				// Fallback to random characters from a variety of sets with length 6-10
+				p, _ = generator.GenerateVaried(6, 10)
 			}
 			passwords = append(passwords, p)
 		}

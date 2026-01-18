@@ -15,6 +15,27 @@ const (
 
 // GenerateRandomFromSet generates a random password of length [minLen, maxLen] using the provided charset
 func GenerateRandomFromSet(minLen, maxLen int) (string, error) {
+	return generateWithCharset(minLen, maxLen, commonChars)
+}
+
+// GenerateVaried picks a random 'style' for the password to create more realistic variations
+func GenerateVaried(minLen, maxLen int) (string, error) {
+	styles := []string{
+		lowerChars,
+		digitChars,
+		lowerChars + digitChars,
+		upperChars + digitChars,
+		lowerChars + upperChars + digitChars,
+		commonChars,
+	}
+
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(styles))))
+	selectedCharset := styles[n.Int64()]
+
+	return generateWithCharset(minLen, maxLen, selectedCharset)
+}
+
+func generateWithCharset(minLen, maxLen int, charset string) (string, error) {
 	length := minLen
 	if maxLen > minLen {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(maxLen-minLen+1)))
@@ -26,8 +47,8 @@ func GenerateRandomFromSet(minLen, maxLen int) (string, error) {
 
 	res := make([]byte, length)
 	for i := 0; i < length; i++ {
-		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(commonChars))))
-		res[i] = commonChars[n.Int64()]
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		res[i] = charset[idx.Int64()]
 	}
 	return string(res), nil
 }
@@ -54,6 +75,6 @@ func GenerateByBlockPattern(minBlocks, maxBlocks int) (string, error) {
 }
 
 func getRandomChar(charset string) string {
-	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-	return string(charset[n.Int64()])
+	idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+	return string(charset[idx.Int64()])
 }
