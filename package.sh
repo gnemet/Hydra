@@ -22,20 +22,8 @@ cp .env "$DIST_DIR/"
 cp users.txt "$DIST_DIR/"
 cp passwords.txt "$DIST_DIR/"
 
-# 5. Create README
-cat <<EOF > "$DIST_DIR/README.md"
-# 🐉 Hydra Deployment
-
-## Quick Start
-1. Edit \`.env\` with your target NAS IP and settings.
-2. Ensure you have static IP configured if using direct UTP connection.
-3. Run:
-   ./parallel.sh
-
-## Requirements
-- Linux OS (x86_64)
-- curl, grep, awk, split (Standard on most Linux distros)
-EOF
+# 5. Copy README
+cp README.md "$DIST_DIR/"
 
 echo "✅ Done! Deployment files are in: $DIST_DIR"
 echo "You can now copy this folder to your other machine."
