@@ -17,7 +17,24 @@ if lsof -Pi :8082 -sTCP:LISTEN -t >/dev/null ; then
     sleep 1
 fi
 
-# 3. Start Test Server in background
+# 3. Mode Selection
+echo "Select option:"
+echo "1) Single Scrape (configs/test_config.yaml)"
+echo "2) Brute Force Mode (.env + lists)"
+echo "3) Password Generator (regex variations)"
+read -p "Selection (1/2/3): " mode
+
+if [ "$mode" == "3" ]; then
+    echo "🔑 Generator Settings:"
+    read -p "How many passwords? (default 10): " count
+    count=${count:-10}
+    echo "Generating $count passwords into passwords.txt..."
+    ./bin/hydra-gen -n $count -min 6 -max 10 >> passwords.txt
+    echo "✅ Done. You can now run Brute Force mode."
+    exit 0
+fi
+
+# 4. Start Test Server in background
 echo "🌐 Starting Test Server at http://localhost:8082..."
 ./bin/testserver &
 SERVER_PID=$!
@@ -27,12 +44,6 @@ sleep 1
 
 # Ensure the server is killed when the script exits
 trap "echo '🛑 Stopping Test Server...'; kill $SERVER_PID" EXIT
-
-# 4. Mode Selection
-echo "Select mode:"
-echo "1) Single Scrape (configs/test_config.yaml)"
-echo "2) Brute Force Mode (.env + lists)"
-read -p "Selection (1/2): " mode
 
 if [ "$mode" == "2" ]; then
     echo "🐲 Running Hydra Brute Force..."

@@ -3,6 +3,7 @@
 HYDRA_BIN=bin/hydra
 SERVER_BIN=bin/testserver
 BRUTE_BIN=bin/hydra-brute
+GEN_BIN=bin/hydra-gen
 
 build:
 	mkdir -p bin
@@ -16,7 +17,11 @@ build-brute:
 	mkdir -p bin
 	go build -o $(BRUTE_BIN) cmd/hydra-brute/main.go
 
-build-all: build build-server build-brute
+build-gen:
+	mkdir -p bin
+	go build -o $(GEN_BIN) cmd/hydra-gen/main.go
+
+build-all: build build-server build-brute build-gen
 
 run: build
 	./$(HYDRA_BIN) configs/config.yaml

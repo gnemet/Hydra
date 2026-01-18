@@ -25,5 +25,6 @@ bin/
 /hydra
 /testserver
 /hydra-brute
+/hydra-gen
 .env
 
