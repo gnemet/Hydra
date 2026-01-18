@@ -110,10 +110,10 @@ if [ "$SKIP_GEN" = false ]; then
         percent=$(( current_count * 100 / GEN_COUNT ))
         if [ "$percent" -gt 100 ]; then percent=100; fi
         
-        # Progress bar
-        bar_len=$((percent / 2))
+        # Shortened Progress bar (30 chars) to fit narrow terminals
+        bar_len=$((percent * 30 / 100))
         bar=$(printf "%${bar_len}s" | tr " " "#")
-        printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$bar" "$percent" "$current_count" "$GEN_COUNT"
+        printf "\r\033[K   > Progress: [%-30s] %d%% (%d/%d)" "$bar" "$percent" "$current_count" "$GEN_COUNT"
         
         if [ "$still_running" -eq 0 ]; then break; fi
         sleep 0.5
@@ -172,10 +172,10 @@ while true; do
     fi
     if [ "$percent" -gt 100 ]; then percent=100; fi
     
-    # Progress bar
-    bar_len=$((percent / 2))
+    # Shortened Progress bar (30 chars) to fit narrow terminals
+    bar_len=$((percent * 30 / 100))
     bar=$(printf "%${bar_len}s" | tr " " "#")
-    printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$bar" "$percent" "$tested_count" "$TOTAL_FOR_BRUTE"
+    printf "\r\033[K   > Progress: [%-30s] %d%% (%d/%d)" "$bar" "$percent" "$tested_count" "$TOTAL_FOR_BRUTE"
     
     if [ "$still_running" -eq 0 ]; then break; fi
     sleep 1
@@ -251,7 +251,7 @@ else
         fi
 
         tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F":" "{sum+=\$2} END {print sum+0}")
-        printf "\r   ⮕  Progress: %d/%d" "$tested_count" "$PHASE2_COUNT"
+        printf "\r\033[K   > Progress: %d/%d" "$tested_count" "$PHASE2_COUNT"
         
         if [ "$still_running" -eq 0 ]; then break; fi
         sleep 1
