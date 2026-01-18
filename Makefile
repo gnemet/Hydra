@@ -1,12 +1,26 @@
-.PHONY: build run test clean
+.PHONY: build run test clean build-all run-test-env
 
-BINARY_NAME=hydra
+HYDRA_BIN=bin/hydra
+SERVER_BIN=bin/testserver
 
 build:
-	go build -o bin/$(BINARY_NAME) cmd/hydra/main.go
+	mkdir -p bin
+	go build -o $(HYDRA_BIN) cmd/hydra/main.go
 
-run:
-	go run cmd/hydra/main.go configs/config.yaml
+build-server:
+	mkdir -p bin
+	go build -o $(SERVER_BIN) cmd/testserver/main.go
+
+build-all: build build-server
+
+run: build
+	./$(HYDRA_BIN) configs/config.yaml
+
+run-test-config: build
+	./$(HYDRA_BIN) configs/test_config.yaml
+
+run-server: build-server
+	./$(SERVER_BIN)
 
 test:
 	go test ./...

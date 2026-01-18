@@ -23,3 +23,5 @@
 # Project specific
 bin/
 /hydra
+/testserver
+
