@@ -10,10 +10,10 @@ import (
 
 func main() {
 	count := flag.Int("n", 10, "Number of passwords to generate")
-	minBlocks := flag.Int("min", 6, "Minimum number of blocks")
-	maxBlocks := flag.Int("max", 10, "Maximum number of blocks")
+	minLen := flag.Int("min", 6, "Minimum length")
+	maxLen := flag.Int("max", 10, "Maximum length")
 	outputFile := flag.String("o", "", "Output file (default: stdout)")
-	useSet := flag.Bool("set", false, "Use generic [a-zA-Z0-9_] character set instead of block pattern")
+	usePattern := flag.Bool("pattern", false, "Use complex block pattern ([a-z][A-Z][0-9]_){n}")
 	flag.Parse()
 
 	var out *os.File = os.Stdout
@@ -29,10 +29,10 @@ func main() {
 
 	for i := 0; i < *count; i++ {
 		var password string
-		if *useSet {
-			password, _ = generator.GenerateVaried(*minBlocks, *maxBlocks)
+		if *usePattern {
+			password, _ = generator.GenerateByBlockPattern(*minLen, *maxLen)
 		} else {
-			password, _ = generator.GenerateByBlockPattern(*minBlocks, *maxBlocks)
+			password, _ = generator.GenerateVaried(*minLen, *maxLen)
 		}
 		fmt.Fprintln(out, password)
 	}

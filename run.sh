@@ -28,8 +28,8 @@ if [ "$mode" == "3" ]; then
     echo "🔑 Generator Settings:"
     read -p "How many passwords? (default 10): " count
     count=${count:-10}
-    echo "Generating $count passwords into passwords.txt..."
-    ./bin/hydra-gen -n $count -min 6 -max 10 >> passwords.txt
+    echo "Generating $count varied variations (6-10 chars) into passwords.txt..."
+    ./bin/hydra-gen -n $count >> passwords.txt
     echo "✅ Done. You can now run Brute Force mode."
     exit 0
 fi
