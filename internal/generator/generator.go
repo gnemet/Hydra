@@ -9,7 +9,7 @@ const (
 	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
 	upperChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digitChars  = "0123456789"
-	specChars   = "_"
+	specChars   = "!@#_-"
 	commonChars = lowerChars + upperChars + digitChars + specChars
 )
 
@@ -183,4 +183,45 @@ func GetRandIdx(max int64) (int, error) {
 		return 0, err
 	}
 	return int(n.Int64()), nil
+}
+
+// CalculateComplexity returns a score (lower is weaker/simpler).
+// Weakest: all lowercase, short.
+// Stronger: mixed case, numbers at end, special characters, longer.
+func CalculateComplexity(p string) int {
+	score := len(p)
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	hasSpec := false
+
+	for i, r := range p {
+		if r >= 'A' && r <= 'Z' {
+			hasUpper = true
+			if i == 0 {
+				score += 1 // Common habit: starts with capital (slight bump)
+			}
+		} else if r >= 'a' && r <= 'z' {
+			hasLower = true
+		} else if r >= '0' && r <= '9' {
+			hasDigit = true
+			if i == len(p)-1 {
+				score += 1 // Common habit: ends with number
+			}
+		} else {
+			hasSpec = true
+		}
+	}
+
+	if hasUpper && hasLower {
+		score += 5
+	}
+	if hasDigit {
+		score += 5
+	}
+	if hasSpec {
+		score += 10
+	}
+
+	return score
 }

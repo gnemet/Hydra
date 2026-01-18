@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -105,12 +106,11 @@ func main() {
 	maxRetries := *count * (*maxRetriesFactor)
 	retries := 0
 
-	// Strategy: If using mutation with a simpass, always try the seed(s) first
-	if *useMutation {
-		for _, seed := range basePasswords {
-			if generatedCount < *count {
-				if compiledRegex == nil || compiledRegex.MatchString(seed) {
-					fmt.Fprintln(out, seed)
+	// 1. Always try seed(s) first if they fit rules
+	for _, seed := range basePasswords {
+		if generatedCount < *count {
+			if compiledRegex == nil || compiledRegex.MatchString(seed) {
+				if !seen[seed] {
 					seen[seed] = true
 					generatedCount++
 				}
@@ -118,10 +118,10 @@ func main() {
 		}
 	}
 
+	// 2. Generation Loop
 	for generatedCount < *count && retries < maxRetries {
 		retries++
 		var password string
-		// Adjust length for prefix
 		adjMin := *minLen - len(*prefix)
 		adjMax := *maxLen - len(*prefix)
 		if adjMin < 0 {
@@ -132,7 +132,6 @@ func main() {
 		}
 
 		if *useMutation && len(basePasswords) > 0 {
-			// Pick a random base password as seed
 			idx, _ := generator.GetRandIdx(int64(len(basePasswords)))
 			seed := basePasswords[idx]
 			password, _ = generator.Mutate(seed, adjMin, adjMax)
@@ -148,12 +147,10 @@ func main() {
 			continue
 		}
 
-		// Regex Validation
 		if compiledRegex != nil && !compiledRegex.MatchString(password) {
 			continue
 		}
 
-		// Double check similarity to any base if threshold is set (safety check)
 		if len(basePasswords) > 0 && *threshold > 0 {
 			isSimilar := false
 			for _, base := range basePasswords {
@@ -163,13 +160,26 @@ func main() {
 				}
 			}
 			if !isSimilar {
-				continue // Try again
+				continue
 			}
 		}
 
-		fmt.Fprintln(out, password)
 		seen[password] = true
 		generatedCount++
+	}
+
+	// 3. Collect and Sort by Complexity
+	var finalPasswords []string
+	for p := range seen {
+		finalPasswords = append(finalPasswords, p)
+	}
+
+	sort.Slice(finalPasswords, func(i, j int) bool {
+		return generator.CalculateComplexity(finalPasswords[i]) < generator.CalculateComplexity(finalPasswords[j])
+	})
+
+	for _, p := range finalPasswords {
+		fmt.Fprintln(out, p)
 	}
 }
 
