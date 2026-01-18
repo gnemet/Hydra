@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+*/*.log
+**/*.log
 
 # Test binary, built with `go test -c`
 *.test
@@ -27,4 +29,7 @@ bin/
 /hydra-brute
 /hydra-gen
 .env
+master_passwords.txt
+users.txt
+/temp_lists
 
