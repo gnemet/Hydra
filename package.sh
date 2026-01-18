@@ -22,8 +22,9 @@ cp .env "$DIST_DIR/"
 cp users.txt "$DIST_DIR/"
 cp passwords.txt "$DIST_DIR/"
 
-# 5. Copy README
+# 5. Copy README and Setup
 cp README.md "$DIST_DIR/"
+cp setup.md "$DIST_DIR/"
 
 echo "✅ Done! Deployment files are in: $DIST_DIR"
 echo "You can now copy this folder to your other machine."
