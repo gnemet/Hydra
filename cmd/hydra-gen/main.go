@@ -22,7 +22,6 @@ func main() {
 	defMin := getEnvInt("HYDRA_MIN_LEN", 6)
 	defMax := getEnvInt("HYDRA_MAX_LEN", 10)
 
-	// Attempt to extract range from HYDRA_PASS_REGEX (e.g., [a-z]{6,10})
 	passRegex := os.Getenv("HYDRA_PASS_REGEX")
 	if passRegex != "" {
 		if start := strings.Index(passRegex, "{"); start != -1 {
@@ -62,6 +61,8 @@ func main() {
 	prefix := flag.String("prefix", defPrefix, "Constant prefix for all generated passwords")
 	simPass := flag.String("simpass", "", "Single base password for similarity check")
 	useMutation := flag.Bool("mutate", false, "Use mutation strategies instead of random generation")
+	useSequential := flag.Bool("sequential", false, "Use exhaustive sequential brute force")
+	useCombinatorial := flag.Bool("combine", false, "Combine seeds with each other")
 	maxRetriesFactor := flag.Int("retries-factor", defMaxRetriesFactor, "Retries factor (max_retries = n * factor)")
 	flag.Parse()
 
@@ -80,8 +81,6 @@ func main() {
 					basePasswords = append(basePasswords, trimmed)
 				}
 			}
-		} else {
-			fmt.Fprintf(os.Stderr, "Warning: Could not read similarity file %s: %v\n", *simFile, err)
 		}
 	}
 
@@ -103,33 +102,66 @@ func main() {
 
 	generatedCount := 0
 	seen := make(map[string]bool)
-	maxRetries := *count * (*maxRetriesFactor)
-	retries := 0
 
-	// 1. Always try seed(s) first if they fit rules
-	for _, seed := range basePasswords {
-		if generatedCount < *count {
-			if compiledRegex == nil || compiledRegex.MatchString(seed) {
-				if !seen[seed] {
-					seen[seed] = true
-					generatedCount++
+	// 1. COMBINATORIAL: Combine seeds (Highest likelihood)
+	if *useCombinatorial && len(basePasswords) > 1 {
+		for _, s1 := range basePasswords {
+			for idx2, s2 := range basePasswords {
+				if generatedCount >= *count {
+					break
+				}
+				// Skip same string unless combined with others
+				combos := []string{
+					s1 + s2,
+					strings.Title(s1) + s2,
+					s1 + strings.Title(s2),
+					strings.Title(s1) + strings.Title(s2),
+				}
+				if idx2 < len(basePasswords)-1 {
+					combos = append(combos, s1+basePasswords[idx2+1])
+				}
+
+				for _, combo := range combos {
+					if len(combo) >= *minLen && len(combo) <= *maxLen {
+						if compiledRegex == nil || compiledRegex.MatchString(combo) {
+							if !seen[combo] {
+								seen[combo] = true
+								generatedCount++
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 
-	// 2. Generation Loop
+	// 2. SEQUENTIAL: Systematic systematic search
+	if *useSequential {
+		charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#_-"
+		it := generator.NewSequentialIterator(charset, *minLen, *maxLen)
+		for generatedCount < *count {
+			p, ok := it.Next()
+			if !ok {
+				break
+			}
+			if compiledRegex != nil && !compiledRegex.MatchString(p) {
+				continue
+			}
+			if !seen[p] {
+				seen[p] = true
+				generatedCount++
+			}
+		}
+	}
+
+	// 3. MUTATION / RANDOM: Final fill
+	maxRetries := *count * (*maxRetriesFactor)
+	retries := 0
 	for generatedCount < *count && retries < maxRetries {
 		retries++
 		var password string
 		adjMin := *minLen - len(*prefix)
 		adjMax := *maxLen - len(*prefix)
-		if adjMin < 0 {
-			adjMin = 0
-		}
-		if adjMax < adjMin {
-			adjMax = adjMin
-		}
 
 		if *useMutation && len(basePasswords) > 0 {
 			idx, _ := generator.GetRandIdx(int64(len(basePasswords)))
@@ -143,14 +175,17 @@ func main() {
 
 		password = *prefix + password
 
+		// Uniqueness
 		if seen[password] {
 			continue
 		}
 
+		// Regex
 		if compiledRegex != nil && !compiledRegex.MatchString(password) {
 			continue
 		}
 
+		// Similarity Check (restored)
 		if len(basePasswords) > 0 && *threshold > 0 {
 			isSimilar := false
 			for _, base := range basePasswords {
@@ -168,7 +203,7 @@ func main() {
 		generatedCount++
 	}
 
-	// 3. Collect and Sort by Complexity
+	// 4. Final Complexity Sort
 	var finalPasswords []string
 	for p := range seen {
 		finalPasswords = append(finalPasswords, p)

@@ -33,23 +33,31 @@ All settings are managed in your `.env` file for portability.
 ## 📖 Usage Guide
 
 ### 1. Direct Recovery
-If you have the NAS connected and `.env` configured:
+By default, Hydra uses settings from `.env`:
 ```bash
 ./parallel.sh
+```
+You can also specify a **Custom Config File**:
+```bash
+./parallel.sh my_nas.env
 ```
 
 ### 2. Testing with Simulator
 To verify your settings work against a simulated Thecus NAS:
-1. Set `HYDRA_URL=http://localhost:8082/adm/login.php` in `.env`.
-2. Run `./parallel.sh`. 
+1. Ensure `HYDRA_URL` points to `localhost:8082` in your config.
+2. Run:
+   ```bash
+   ./parallel.sh
+   ```
 3. The script will automatically start the `testserver` and verify the logic.
 
 ### 3. Deploying to another machine
-1. Run the packager:
+1. Build the production binaries:
    ```bash
    ./package.sh
    ```
-2. Copy the resulting `hydra_dist/` folder to the target machine.
+2. Copy the resulting `hydra_dist/` folder to your target machine.
+3. Check **setup.md** for Windows/WSL specific instructions.
 
 ---
 

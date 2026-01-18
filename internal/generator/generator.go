@@ -185,6 +185,55 @@ func GetRandIdx(max int64) (int, error) {
 	return int(n.Int64()), nil
 }
 
+// SequentialIterator keeps track of the state for exhaustive brute force
+type SequentialIterator struct {
+	charset []rune
+	indices []int
+	minLen  int
+	maxLen  int
+	done    bool
+}
+
+func NewSequentialIterator(charset string, minLen, maxLen int) *SequentialIterator {
+	return &SequentialIterator{
+		charset: []rune(charset),
+		indices: make([]int, minLen),
+		minLen:  minLen,
+		maxLen:  maxLen,
+	}
+}
+
+func (it *SequentialIterator) Next() (string, bool) {
+	if it.done {
+		return "", false
+	}
+
+	// Build current string
+	res := make([]rune, len(it.indices))
+	for i, idx := range it.indices {
+		res[i] = it.charset[idx]
+	}
+
+	// Increment indices
+	for i := len(it.indices) - 1; i >= 0; i-- {
+		it.indices[i]++
+		if it.indices[i] < len(it.charset) {
+			return string(res), true
+		}
+		it.indices[i] = 0
+		if i == 0 {
+			// Length increase
+			if len(it.indices) < it.maxLen {
+				it.indices = make([]int, len(it.indices)+1)
+			} else {
+				it.done = true
+			}
+		}
+	}
+
+	return string(res), true
+}
+
 // CalculateComplexity returns a score (lower is weaker/simpler).
 // Weakest: all lowercase, short.
 // Stronger: mixed case, numbers at end, special characters, longer.

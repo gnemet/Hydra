@@ -1,10 +1,15 @@
 #!/bin/bash
 
 # Load configuration
-if [ -f .env ]; then
+CONFIG_FILE=${1:-.env}
+if [ -f "$CONFIG_FILE" ]; then
+    echo "📂 Loading configuration from $CONFIG_FILE"
     set -a
-    . .env
+    . "$CONFIG_FILE"
     set +a
+elif [ "$CONFIG_FILE" != ".env" ]; then
+    echo "❌ Error: Config file $CONFIG_FILE not found."
+    exit 1
 fi
 
 GEN_COUNT=${HYDRA_GEN_COUNT:-1000}
@@ -83,6 +88,11 @@ if [ "$SKIP_GEN" = false ]; then
     echo "📦 Phase 1/2: Generating passwords..."
     T1_START=$(date +%s)
     pids_gen=()
+    # First, generate combinatorial variations (Seed + Seed)
+    echo "🔗 Creating seed combinations..."
+    ./bin/hydra-gen -n 1000 -simfile "$BASE_PASS_FILE" -combine > "$TEMP_DIR/part_combo.txt" 2>/dev/null &
+    pids_gen+=($!)
+
     for i in "${!base_seeds[@]}"; do
         seed="${base_seeds[$i]}"
         ./bin/hydra-gen -n "$per_seed" -simpass "$seed" -simfile "" -mutate > "$TEMP_DIR/part_$(printf "%02d" $i).txt" 2> /dev/null &
@@ -198,11 +208,11 @@ else
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
     
-    # Generate broad pattern passwords without seeds
+    # For sequential, we use a much larger count if needed, or double GEN_COUNT
     PHASE2_COUNT=$(( GEN_COUNT * 2 ))
-    echo "📦 Generating $PHASE2_COUNT unique passwords from scratch (Pattern Search)..."
+    echo "📦 Generating $PHASE2_COUNT unique passwords sequentially from scratch (Exhaustive)..."
     
-    ./bin/hydra-gen -n "$PHASE2_COUNT" > "$TEMP_DIR/scratch_master.txt"
+    ./bin/hydra-gen -n "$PHASE2_COUNT" -sequential > "$TEMP_DIR/scratch_master.txt"
     
     # Split for parallel brute force
     split -n "l/$THREAD_COUNT" "$TEMP_DIR/scratch_master.txt" "$TEMP_DIR/part_"
