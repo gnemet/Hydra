@@ -25,6 +25,7 @@ func main() {
 	timeoutStr := os.Getenv("HYDRA_TIMEOUT")
 	selector := os.Getenv("HYDRA_TARGET_SELECTOR")
 	successText := os.Getenv("HYDRA_SUCCESS_TEXT")
+	errorText := os.Getenv("HYDRA_ERROR_TEXT")
 	userFile := os.Getenv("HYDRA_USER_FILE")
 	passFile := os.Getenv("HYDRA_PASS_FILE")
 
@@ -54,6 +55,8 @@ func main() {
 	fmt.Printf("--- 🐲 Hydra Brute Force Mode ---\n")
 	fmt.Printf("URL: %s\n", url)
 	fmt.Printf("Users: %d, Passwords: %d\n", len(users), len(passwords))
+	fmt.Printf("Success Text: [%s]\n", successText)
+	fmt.Printf("Error Text: [%s]\n", errorText)
 	fmt.Printf("---------------------------------\n")
 
 	found := false
@@ -68,28 +71,29 @@ func main() {
 
 			content, err := f.FetchPost(url, data)
 			if err != nil {
-				fmt.Printf("[ERROR: %v]\n", err)
+				fmt.Printf("[NETWORK ERROR: %v]\n", err)
 				continue
 			}
 
 			result, err := e.Elevate(content)
 			if err != nil {
-				// We expect some elements might not be found if authentication fails
-				// depending on how the server responds.
-				// In our test server, the ID #response is always returned.
 				fmt.Printf("[EVAL ERROR: %v]\n", err)
 				continue
 			}
 
 			cleanResult := strings.TrimSpace(result)
-			if strings.Contains(cleanResult, successText) {
+
+			// Categorization logic
+			if successText != "" && strings.Contains(cleanResult, successText) {
 				fmt.Printf("✅ SUCCESS!\n")
 				fmt.Printf(">> Response: %s\n", cleanResult)
 				found = true
-				// We can break or continue. Break to find first valid.
 				break
+			} else if errorText != "" && strings.Contains(cleanResult, errorText) {
+				fmt.Printf("❌ FAILED (Known Denial)\n")
 			} else {
-				fmt.Printf("❌ FAILED\n")
+				fmt.Printf("❓ UNKNOWN RESPONSE (Potential Success?)\n")
+				fmt.Printf(">> Captured: %s\n", cleanResult)
 			}
 		}
 		if found {
