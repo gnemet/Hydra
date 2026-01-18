@@ -5,3 +5,4 @@ fetcher:
 evaluator:
   target_selector: "title"
   logic: "extract_text"
+

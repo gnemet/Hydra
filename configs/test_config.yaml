@@ -2,6 +2,7 @@ fetcher:
   url: "http://localhost:8082"
   timeout_seconds: 5
 
+
 evaluator:
   target_selector: "h1"
   logic: "extract_text"
