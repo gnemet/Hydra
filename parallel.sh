@@ -19,9 +19,41 @@ rm -rf "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
 
 echo "--- 🚀 Hydra Parallel Orchestrator (Multi-Seed Generation) ---"
+LAN_IP=$(hostname -I | awk '{print $1}')
 echo "Target: $HYDRA_URL"
+echo "Local LAN IP: $LAN_IP"
+echo "LAN Access: http://$LAN_IP:8082"
 
-# 3. Read Base Passwords
+# 3. Connectivity Pre-Check
+TARGET_IP=$(echo "$HYDRA_URL" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || echo "localhost")
+
+# If target is localhost, start the server FIRST so the check passes
+if [[ "$TARGET_IP" == "localhost" ]]; then
+    if ! lsof -i:8082 > /dev/null; then
+        echo "🌐 Starting Local Test Server for simulation..."
+        ./bin/testserver > /dev/null 2>&1 &
+        SERVER_PID=$!
+        sleep 1
+        trap "kill $SERVER_PID" EXIT
+    fi
+fi
+
+echo "🔍 Checking connectivity to $TARGET_IP..."
+
+if [[ "$TARGET_IP" != "localhost" ]]; then
+    if ! ping -c 1 -W 2 "$TARGET_IP" > /dev/null; then
+        echo "❌ Error: Cannot ping $TARGET_IP. Check your UTP cable and IP settings."
+        exit 1
+    fi
+fi
+
+if ! curl -s --head --connect-timeout 2 "$HYDRA_URL" > /dev/null; then
+    echo "⚠️  Warning: URL $HYDRA_URL seems unreachable (No HTTP response)."
+    read -p "Continue anyway? (y/n): " cont
+    if [ "$cont" != "y" ]; then exit 1; fi
+fi
+
+# 4. Read Base Passwords
 if [ ! -f "$BASE_PASS_FILE" ]; then
     echo "❌ Error: Base password file $BASE_PASS_FILE not found."
     exit 1
@@ -65,13 +97,11 @@ while true; do
 done
 echo -e "\n✅ Generation Complete."
 
-# 5. Start Test Server (if not running on 8082)
-if ! lsof -i:8082 > /dev/null; then
-    echo "🌐 Starting Test Server..."
-    ./bin/testserver > /dev/null 2>&1 &
-    SERVER_PID=$!
-    sleep 1
-    trap "kill $SERVER_PID" EXIT
+# 5. Start Test Server (if target is NOT localhost but we want it anyway, or if failed to start earlier)
+if [[ "$TARGET_IP" != "localhost" ]] && ! lsof -i:8082 > /dev/null; then
+    # Usually we don't start the test server if attacking a real IP, 
+    # but we keep this here as a fallback or for local alias testing.
+    echo "🌐 Note: Local test server not started (Target is remote)."
 fi
 
 # 6. Launch Parallel Brute Force

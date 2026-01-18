@@ -108,14 +108,23 @@ func main() {
 	fmt.Printf("Error Text: [%s]\n", errorText)
 	fmt.Printf("---------------------------------\n")
 
+	userField := os.Getenv("HYDRA_USER_FIELD")
+	if userField == "" {
+		userField = "username"
+	}
+	passField := os.Getenv("HYDRA_PASS_FIELD")
+	if passField == "" {
+		passField = "password"
+	}
+
 	found := false
 	for _, user := range users {
 		for _, pass := range passwords {
 			fmt.Printf("Testing: %s:%s ... ", user, pass)
 
 			data := map[string]string{
-				"username": user,
-				"password": pass,
+				userField: user,
+				passField: pass,
 			}
 
 			content, err := f.FetchPost(url, data)

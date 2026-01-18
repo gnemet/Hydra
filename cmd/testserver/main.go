@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -37,18 +38,29 @@ func main() {
 	fs := http.FileServer(http.Dir("cmd/testserver/static"))
 	mux.Handle("/", fs)
 
-	// Login endpoint
-	mux.HandleFunc("/login", loginHandler)
+	// Thecus Typical Endpoint
+	mux.HandleFunc("/adm/login.php", loginHandler)
+
+	host := flag.String("host", "", "Host to bind to (leave empty for all interfaces)")
+	flag.Parse()
 
 	port := ":8082"
+	bindAddr := *host + port
+
 	server := &http.Server{
-		Addr:         port,
+		Addr:         bindAddr,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
 
-	fmt.Printf("Test Server starting on http://localhost%s\n", port)
+	displayHost := *host
+	if displayHost == "" {
+		displayHost = "0.0.0.0"
+	}
+	fmt.Printf("--- 🌐 THECUS SIMULATOR (LAN MODE) ---\n")
+	fmt.Printf("Endpoint: http://%s%s/adm/login.php\n", displayHost, port)
+	fmt.Printf("Expected Fields: u_name, u_pwd\n")
 	log.Fatal(server.ListenAndServe())
 }
 
@@ -64,14 +76,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := r.FormValue("username")
-	password := r.FormValue("password")
+	// Thecus field names: u_name, u_pwd
+	username := r.FormValue("u_name")
+	password := r.FormValue("u_pwd")
 
-	// Simulate processing time
-	time.Sleep(500 * time.Millisecond)
+	// Simulate old NAS CPU delay
+	time.Sleep(800 * time.Millisecond)
 
 	isValid := false
-	// Check against config
 	for _, cred := range serverConfig.Login {
 		if username == cred.Username && password == cred.Password {
 			isValid = true
@@ -79,17 +91,16 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Content-Type", "text/html")
 	if isValid {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<div id="response" class="success-message">
-			<i class="fas fa-check-circle"></i>
-			Welcome back, %s! Authentication successful.
-		</div>`, username)
+		fmt.Fprintf(w, `<html><body>
+			<h1>Thecus N4100 Management</h1>
+			<div id="status">Login Success: Welcome to the Control Panel</div>
+		</body></html>`)
 	} else {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<div id="response" class="error-message">
-			<i class="fas fa-exclamation-triangle"></i>
-			Access Denied. Incorrect password.
-		</div>`)
+		fmt.Fprintf(w, `<html><body>
+			<h1>Thecus N4100 Management</h1>
+			<div id="error">Invalid username or password. Please Retry.</div>
+		</body></html>`)
 	}
 }
