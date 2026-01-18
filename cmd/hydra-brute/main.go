@@ -10,6 +10,7 @@ import (
 
 	"hydra/internal/evaluator"
 	"hydra/internal/fetcher"
+	"hydra/internal/generator"
 
 	"github.com/joho/godotenv"
 )
@@ -28,6 +29,8 @@ func main() {
 	errorText := os.Getenv("HYDRA_ERROR_TEXT")
 	userFile := os.Getenv("HYDRA_USER_FILE")
 	passFile := os.Getenv("HYDRA_PASS_FILE")
+	passRegex := os.Getenv("HYDRA_PASS_REGEX")
+	genCountStr := os.Getenv("HYDRA_GEN_COUNT")
 
 	if url == "" || selector == "" {
 		log.Fatal("HYDRA_URL and HYDRA_TARGET_SELECTOR must be set in .env")
@@ -38,14 +41,26 @@ func main() {
 		timeout = 5
 	}
 
+	genCount, _ := strconv.Atoi(genCountStr)
+
 	// 2. Load lists
 	users, err := readLines(userFile)
 	if err != nil {
 		log.Fatalf("Error reading users: %v", err)
 	}
-	passwords, err := readLines(passFile)
-	if err != nil {
-		log.Fatalf("Error reading passwords: %v", err)
+
+	passwords, _ := readLines(passFile)
+
+	// Dynamic runtime generation
+	if passRegex != "" && genCount > 0 {
+		fmt.Printf("Dynamic generation enabled: %s (Count: %d)\n", passRegex, genCount)
+		for i := 0; i < genCount; i++ {
+			// For now, we support the block pattern requested
+			if strings.Contains(passRegex, "[a-z][A-Z][0-9][_]") {
+				p, _ := generator.GenerateByBlockPattern(6, 10)
+				passwords = append(passwords, p)
+			}
+		}
 	}
 
 	// 3. Initialize Hydra components
