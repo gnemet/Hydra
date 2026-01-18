@@ -4,10 +4,33 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
+type Config struct {
+	Login []struct {
+		Username string `yaml:"username"`
+		Password string `yaml:"password"`
+	} `yaml:"login"`
+}
+
+var serverConfig Config
+
 func main() {
+	// Load config
+	data, err := os.ReadFile("configs/test_config.yaml")
+	if err != nil {
+		log.Printf("Warning: Could not read config file: %v. Using defaults.", err)
+	} else {
+		err = yaml.Unmarshal(data, &serverConfig)
+		if err != nil {
+			log.Printf("Warning: Could not parse config file: %v", err)
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	// Serve static files
@@ -47,7 +70,16 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Simulate processing time
 	time.Sleep(500 * time.Millisecond)
 
-	if password == "secret123" {
+	isValid := false
+	// Check against config
+	for _, cred := range serverConfig.Login {
+		if username == cred.Username && password == cred.Password {
+			isValid = true
+			break
+		}
+	}
+
+	if isValid {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<div id="response" class="success-message">
 			<i class="fas fa-check-circle"></i>

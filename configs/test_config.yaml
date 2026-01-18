@@ -6,3 +6,7 @@ fetcher:
 evaluator:
   target_selector: "h1"
   logic: "extract_text"
+
+login:
+  - username: "admin"
+    password: "wpongo12"

@@ -56,17 +56,42 @@ func main() {
 
 	passwords, _ := readLines(passFile)
 
-	// Dynamic runtime generation
-	if passRegex != "" && genCount > 0 {
-		fmt.Printf("Dynamic generation enabled: %s (Count: %d)\n", passRegex, genCount)
+	// Parse length from regex if possible
+	defMin, defMax := 6, 10
+	if passRegex != "" {
+		if start := strings.Index(passRegex, "{"); start != -1 {
+			if end := strings.Index(passRegex, "}"); end != -1 {
+				parts := strings.Split(passRegex[start+1:end], ",")
+				if len(parts) == 2 {
+					if min, err := strconv.Atoi(parts[0]); err == nil {
+						defMin = min
+					}
+					if max, err := strconv.Atoi(parts[1]); err == nil {
+						defMax = max
+					}
+				} else if len(parts) == 1 {
+					if n, err := strconv.Atoi(parts[0]); err == nil {
+						defMin = n
+						defMax = n
+					}
+				}
+			}
+		}
+	}
+
+	// Dynamic runtime generation - only if no password list was provided
+	if len(passwords) == 0 && passRegex != "" && genCount > 0 {
+		fmt.Printf("Dynamic generation enabled: %s (Count: %d, Range: %d-%d)\n", passRegex, genCount, defMin, defMax)
 		for i := 0; i < genCount; i++ {
 			var p string
 			// Detect if strictly following the 4-char block pattern
 			if strings.Contains(passRegex, "([a-z][A-Z][0-9][_])") {
-				p, _ = generator.GenerateByBlockPattern(6, 10)
+				// For blocks, we translate length to block count if reasonable,
+				// but here we keep simple logic or use the parsed length as block count if that's the intent.
+				// Based on internal/generator, blocks = length param.
+				p, _ = generator.GenerateByBlockPattern(defMin, defMax)
 			} else {
-				// Fallback to random characters from a variety of sets with length 6-10
-				p, _ = generator.GenerateVaried(6, 10)
+				p, _ = generator.GenerateVaried(defMin, defMax)
 			}
 			passwords = append(passwords, p)
 		}

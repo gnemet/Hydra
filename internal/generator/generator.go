@@ -78,3 +78,98 @@ func getRandomChar(charset string) string {
 	idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 	return string(charset[idx.Int64()])
 }
+
+// Mutate takes a seed string and applies variations requested by the user
+func Mutate(seed string, minLen, maxLen int) (string, error) {
+	mut := []rune(seed)
+	if len(mut) == 0 {
+		return GenerateRandomFromSet(minLen, maxLen)
+	}
+
+	// Apply 1 to 3 random mutations to increase the state space
+	numMuts, _ := rand.Int(rand.Reader, big.NewInt(3))
+	for i := 0; i <= int(numMuts.Int64()); i++ {
+		strategy, _ := rand.Int(rand.Reader, big.NewInt(7)) // Increased to 7 strategies
+		switch strategy.Int64() {
+		case 0: // Variations in case: Randomly toggle case of letters
+			for j, r := range mut {
+				c, _ := rand.Int(rand.Reader, big.NewInt(10))
+				if c.Int64() < 2 {
+					if r >= 'a' && r <= 'z' {
+						mut[j] = r - 'a' + 'A'
+					} else if r >= 'A' && r <= 'Z' {
+						mut[j] = r - 'A' + 'a'
+					}
+				}
+			}
+		case 1: // Start with a random number
+			n := rune(digitChars[getRandIdxString(digitChars)])
+			mut = append([]rune{n}, mut...)
+		case 2: // End with a common sequence
+			suffix, _ := rand.Int(rand.Reader, big.NewInt(5))
+			vals := []string{"123", "2024", "2025", "3125", "5213"}
+			mut = append(mut, []rune(vals[suffix.Int64()])...)
+		case 3: // Include underscore
+			pos, _ := rand.Int(rand.Reader, big.NewInt(int64(len(mut)+1)))
+			mut = append(mut[:pos.Int64()], append([]rune{'_'}, mut[pos.Int64():]...)...)
+		case 4: // Leetspeak
+			subs := map[rune]rune{'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 't': '7'}
+			for j, r := range mut {
+				if s, ok := subs[r]; ok {
+					c, _ := rand.Int(rand.Reader, big.NewInt(10))
+					if c.Int64() < 5 {
+						mut[j] = s
+					}
+				}
+			}
+		case 5: // Capitalize First Letter only
+			if len(mut) > 0 {
+				if mut[0] >= 'a' && mut[0] <= 'z' {
+					mut[0] = mut[0] - 'a' + 'A'
+				}
+			}
+		case 6: // Append a single digit
+			n := rune(digitChars[getRandIdxString(digitChars)])
+			mut = append(mut, n)
+		}
+	}
+
+	// Ensure the result stays within length constraints
+	res := string(mut)
+
+	// Clean up: if we mutated too much, we might have added chars we shouldn't (though unlikely)
+	// But mostly we need to handle length.
+	if len(res) < minLen {
+		extra, _ := generateWithCharset(minLen-len(res), minLen-len(res), commonChars)
+		res += extra
+	}
+	if len(res) > maxLen {
+		// Truncate from random side to keep it interesting
+		side, _ := rand.Int(rand.Reader, big.NewInt(2))
+		if side.Int64() == 0 {
+			res = res[:maxLen]
+		} else {
+			res = res[len(res)-maxLen:]
+		}
+	}
+
+	if res == seed && len(seed) > 0 {
+		return Mutate(seed, minLen, maxLen)
+	}
+
+	return res, nil
+}
+
+func getRandIdxString(s string) int {
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s))))
+	return int(n.Int64())
+}
+
+// GetRandIdx returns a random index up to max
+func GetRandIdx(max int64) (int, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(max))
+	if err != nil {
+		return 0, err
+	}
+	return int(n.Int64()), nil
+}
