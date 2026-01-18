@@ -89,7 +89,7 @@ func Mutate(seed string, minLen, maxLen int) (string, error) {
 	// Apply 1 to 3 random mutations to increase the state space
 	numMuts, _ := rand.Int(rand.Reader, big.NewInt(3))
 	for i := 0; i <= int(numMuts.Int64()); i++ {
-		strategy, _ := rand.Int(rand.Reader, big.NewInt(7)) // Increased to 7 strategies
+		strategy, _ := rand.Int(rand.Reader, big.NewInt(8)) // Increased to 8 strategies
 		switch strategy.Int64() {
 		case 0: // Variations in case: Randomly toggle case of letters
 			for j, r := range mut {
@@ -105,10 +105,13 @@ func Mutate(seed string, minLen, maxLen int) (string, error) {
 		case 1: // Start with a random number
 			n := rune(digitChars[getRandIdxString(digitChars)])
 			mut = append([]rune{n}, mut...)
-		case 2: // End with a common sequence
-			suffix, _ := rand.Int(rand.Reader, big.NewInt(5))
-			vals := []string{"123", "2024", "2025", "3125", "5213"}
-			mut = append(mut, []rune(vals[suffix.Int64()])...)
+		case 2: // End with a common sequence (expanded)
+			vals := []string{
+				"123", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019",
+				"2020", "2021", "2022", "2023", "2024", "2025", "2026", "3125", "5213", "!", "!!", "@", "1",
+			}
+			suffixIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(vals))))
+			mut = append(mut, []rune(vals[suffixIdx.Int64()])...)
 		case 3: // Include underscore
 			pos, _ := rand.Int(rand.Reader, big.NewInt(int64(len(mut)+1)))
 			mut = append(mut[:pos.Int64()], append([]rune{'_'}, mut[pos.Int64():]...)...)
@@ -131,6 +134,14 @@ func Mutate(seed string, minLen, maxLen int) (string, error) {
 		case 6: // Append a single digit
 			n := rune(digitChars[getRandIdxString(digitChars)])
 			mut = append(mut, n)
+		case 7: // Randomly capitalize an internal letter
+			if len(mut) > 1 {
+				pos, _ := rand.Int(rand.Reader, big.NewInt(int64(len(mut)-1)))
+				idx := pos.Int64() + 1
+				if mut[idx] >= 'a' && mut[idx] <= 'z' {
+					mut[idx] = mut[idx] - 'a' + 'A'
+				}
+			}
 		}
 	}
 
