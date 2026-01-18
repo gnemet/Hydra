@@ -29,6 +29,11 @@ func main() {
 	errorText := os.Getenv("HYDRA_ERROR_TEXT")
 	userFile := os.Getenv("HYDRA_USER_FILE")
 	passFile := os.Getenv("HYDRA_PASS_FILE")
+	// Allow override via CLI argument for parallel execution
+	if len(os.Args) > 1 {
+		passFile = os.Args[1]
+	}
+
 	passRegex := os.Getenv("HYDRA_PASS_REGEX")
 	genCountStr := os.Getenv("HYDRA_GEN_COUNT")
 
