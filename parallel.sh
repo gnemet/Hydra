@@ -81,6 +81,7 @@ per_seed=$(( (GEN_COUNT + num_seeds - 1) / num_seeds ))
 # 4. Parallel Generation (One thread per seed)
 if [ "$SKIP_GEN" = false ]; then
     echo "📦 Phase 1/2: Generating passwords..."
+    T1_START=$(date +%s)
     pids_gen=()
     for i in "${!base_seeds[@]}"; do
         seed="${base_seeds[$i]}"
@@ -104,7 +105,9 @@ if [ "$SKIP_GEN" = false ]; then
         if [ "$still_running" -eq 0 ]; then break; fi
         sleep 0.5
     done
-    echo -e "\n✅ Generation Complete."
+    T1_END=$(date +%s)
+    T1_DUR=$(( T1_END - T1_START ))
+    echo -e "\n✅ Generation Complete. (Duration: ${T1_DUR}s)"
 else
     echo "⏩ Skipping Phase 1 (Reusable wordlists found)."
 fi
@@ -119,6 +122,7 @@ fi
 # 6. Launch Parallel Brute Force
 TOTAL_FOR_BRUTE=$(cat "$TEMP_DIR"/part_*.txt 2>/dev/null | wc -l)
 echo "🔥 Phase 2/2: Launching brute force ($TOTAL_FOR_BRUTE passwords)..."
+T2_START=$(date +%s)
 
 pids_brute=()
 for f in "$TEMP_DIR"/part_*.txt; do
@@ -160,6 +164,9 @@ while true; do
     if [ "$still_running" -eq 0 ]; then break; fi
     sleep 1
 done
+T2_END=$(date +%s)
+T2_DUR=$(( T2_END - T2_START ))
+echo -e "\n✅ Brute Force Phase Complete. (Duration: ${T2_DUR}s)"
 
 echo -e "\n----------------------------------------"
 echo "✅ Parallel Scan Complete."
