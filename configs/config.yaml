@@ -1,0 +1,7 @@
+fetcher:
+  url: "https://example.com"
+  timeout_seconds: 10
+
+evaluator:
+  target_selector: "title"
+  logic: "extract_text"
