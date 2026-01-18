@@ -55,11 +55,15 @@ func main() {
 	if passRegex != "" && genCount > 0 {
 		fmt.Printf("Dynamic generation enabled: %s (Count: %d)\n", passRegex, genCount)
 		for i := 0; i < genCount; i++ {
-			// For now, we support the block pattern requested
-			if strings.Contains(passRegex, "[a-z][A-Z][0-9][_]") {
-				p, _ := generator.GenerateByBlockPattern(6, 10)
-				passwords = append(passwords, p)
+			var p string
+			// Detect if strictly following the 4-char block pattern
+			if strings.Contains(passRegex, "([a-z][A-Z][0-9][_])") {
+				p, _ = generator.GenerateByBlockPattern(6, 10)
+			} else {
+				// Fallback to random characters from the [a-zA-Z0-9_] set with length 6-10
+				p, _ = generator.GenerateRandomFromSet(6, 10)
 			}
+			passwords = append(passwords, p)
 		}
 	}
 

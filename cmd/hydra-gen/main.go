@@ -13,6 +13,7 @@ func main() {
 	minBlocks := flag.Int("min", 6, "Minimum number of blocks")
 	maxBlocks := flag.Int("max", 10, "Maximum number of blocks")
 	outputFile := flag.String("o", "", "Output file (default: stdout)")
+	useSet := flag.Bool("set", false, "Use generic [a-zA-Z0-9_] character set instead of block pattern")
 	flag.Parse()
 
 	var out *os.File = os.Stdout
@@ -27,7 +28,12 @@ func main() {
 	}
 
 	for i := 0; i < *count; i++ {
-		password, _ := generator.GenerateByBlockPattern(*minBlocks, *maxBlocks)
+		var password string
+		if *useSet {
+			password, _ = generator.GenerateRandomFromSet(*minBlocks, *maxBlocks)
+		} else {
+			password, _ = generator.GenerateByBlockPattern(*minBlocks, *maxBlocks)
+		}
 		fmt.Fprintln(out, password)
 	}
 }
