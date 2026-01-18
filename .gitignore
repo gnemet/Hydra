@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+
+# all logs  
 **/*.log
 
 # Test binary, built with `go test -c`
@@ -31,4 +33,5 @@ bin/
 master_passwords.txt
 users.txt
 /temp_lists
+/hydra_dist/
 

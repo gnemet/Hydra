@@ -81,7 +81,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("u_pwd")
 
 	// Simulate old NAS CPU delay
-	time.Sleep(800 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	isValid := false
 	for _, cred := range serverConfig.Login {

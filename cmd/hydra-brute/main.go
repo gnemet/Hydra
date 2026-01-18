@@ -117,9 +117,23 @@ func main() {
 		passField = "password"
 	}
 
+	// 4. State Management for Resuming
+	stateFile := passFile + ".state"
+	lastIdx := -1
+	if data, err := os.ReadFile(stateFile); err == nil {
+		if val, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+			lastIdx = val
+			fmt.Printf("♻️  Resuming from index: %d\n", lastIdx+1)
+		}
+	}
+
 	found := false
 	for _, user := range users {
-		for _, pass := range passwords {
+		for pIdx, pass := range passwords {
+			if pIdx <= lastIdx {
+				continue
+			}
+
 			fmt.Printf("Testing: %s:%s ... ", user, pass)
 
 			data := map[string]string{
@@ -139,12 +153,17 @@ func main() {
 				continue
 			}
 
+			// Update state
+			_ = os.WriteFile(stateFile, []byte(strconv.Itoa(pIdx)), 0644)
+
 			cleanResult := strings.TrimSpace(result)
 
 			// Categorization logic
 			if successText != "" && strings.Contains(cleanResult, successText) {
 				fmt.Printf("✅ SUCCESS!\n")
 				fmt.Printf(">> Response: %s\n", cleanResult)
+				// Clear state on success
+				_ = os.Remove(stateFile)
 				found = true
 				break
 			} else if errorText != "" && strings.Contains(cleanResult, errorText) {
@@ -155,8 +174,7 @@ func main() {
 			}
 		}
 		if found {
-			// break outer if found
-			// break
+			break
 		}
 	}
 

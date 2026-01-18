@@ -8,17 +8,25 @@ if [ -f .env ]; then
 fi
 
 GEN_COUNT=${HYDRA_GEN_COUNT:-1000}
+THREAD_COUNT=${HYDRA_THREAD_COUNT:-4}
 TEMP_DIR=${HYDRA_TEMP_DIR:-"temp_lists"}
 BASE_PASS_FILE=${HYDRA_PASS_FILE:-"passwords.txt"}
 
 # 1. Build
 make build-all
 
-# 2. Prepare Directories
-rm -rf "$TEMP_DIR"
-mkdir -p "$TEMP_DIR"
-
+# 2. Session Management
 echo "--- 🚀 Hydra Parallel Orchestrator (Multi-Seed Generation) ---"
+read -p "♻️  Resume last session? (y/N): " resume
+if [[ "$resume" =~ ^[Yy]$ ]]; then
+    echo "♻️  Resuming session. Skipping password generation."
+    SKIP_GEN=true
+else
+    echo "🗑️  Starting fresh session."
+    rm -rf "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR"
+    SKIP_GEN=false
+fi
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo "Target: $HYDRA_URL"
 echo "Local LAN IP: $LAN_IP"
@@ -71,31 +79,35 @@ echo "Found $num_seeds base seeds in $BASE_PASS_FILE."
 per_seed=$(( (GEN_COUNT + num_seeds - 1) / num_seeds ))
 
 # 4. Parallel Generation (One thread per seed)
-echo "📦 Phase 1/2: Generating passwords..."
-pids_gen=()
-for i in "${!base_seeds[@]}"; do
-    seed="${base_seeds[$i]}"
-    ./bin/hydra-gen -n "$per_seed" -simpass "$seed" -simfile "" -mutate > "$TEMP_DIR/part_$(printf "%02d" $i).txt" 2> /dev/null &
-    pids_gen+=($!)
-done
-
-# Monitor Generation Progress
-while true; do
-    still_running=0
-    for pid in "${pids_gen[@]}"; do
-        if kill -0 "$pid" 2>/dev/null; then ((still_running++)); fi
+if [ "$SKIP_GEN" = false ]; then
+    echo "📦 Phase 1/2: Generating passwords..."
+    pids_gen=()
+    for i in "${!base_seeds[@]}"; do
+        seed="${base_seeds[$i]}"
+        ./bin/hydra-gen -n "$per_seed" -simpass "$seed" -simfile "" -mutate > "$TEMP_DIR/part_$(printf "%02d" $i).txt" 2> /dev/null &
+        pids_gen+=($!)
     done
-    
-    current_count=$(cat "$TEMP_DIR"/part_*.txt 2>/dev/null | wc -l)
-    percent=$(( current_count * 100 / GEN_COUNT ))
-    if [ "$percent" -gt 100 ]; then percent=100; fi
-    
-    printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$(printf "%$((percent/2))s" | tr ' ' '#')" "$percent" "$current_count" "$GEN_COUNT"
-    
-    if [ "$still_running" -eq 0 ]; then break; fi
-    sleep 0.5
-done
-echo -e "\n✅ Generation Complete."
+
+    # Monitor Generation Progress
+    while true; do
+        still_running=0
+        for pid in "${pids_gen[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then ((still_running++)); fi
+        done
+        
+        current_count=$(cat "$TEMP_DIR"/part_*.txt 2>/dev/null | wc -l)
+        percent=$(( current_count * 100 / GEN_COUNT ))
+        if [ "$percent" -gt 100 ]; then percent=100; fi
+        
+        printf "\r   ⮕  Progress: [%-50s] %d%% (%d/%d)" "$(printf "%$((percent/2))s" | tr ' ' '#')" "$percent" "$current_count" "$GEN_COUNT"
+        
+        if [ "$still_running" -eq 0 ]; then break; fi
+        sleep 0.5
+    done
+    echo -e "\n✅ Generation Complete."
+else
+    echo "⏩ Skipping Phase 1 (Reusable wordlists found)."
+fi
 
 # 5. Start Test Server (if target is NOT localhost but we want it anyway, or if failed to start earlier)
 if [[ "$TARGET_IP" != "localhost" ]] && ! lsof -i:8082 > /dev/null; then
@@ -152,20 +164,73 @@ done
 echo -e "\n----------------------------------------"
 echo "✅ Parallel Scan Complete."
 
-# 8. Check for successes in logs
+# 8. Success Report or Fallback
 if [ -n "$success_file" ]; then
     echo "🎯 FOUND SUCCESS!"
-    # Extract the successful line, e.g., "Testing: admin:Secret123 ... ✅ SUCCESS!"
     success_line=$(grep "SUCCESS" "$success_file" | head -n 1)
     creds=$(echo "$success_line" | awk -F'Testing: ' '{print $2}' | awk -F' ' '{print $1}')
     echo "👤 User/Pass: $creds"
     grep -h "Response:" "$success_file"
+    exit 0
 else
-    # Final check just in case it finished and then we checked
     if grep -r "SUCCESS" "$TEMP_DIR"/*.log > /dev/null; then
          echo "🎯 FOUND SUCCESS!"
          grep -h -B 1 "SUCCESS" "$TEMP_DIR"/*.log
-    else
-         echo "❌ No valid credentials found in this run."
+         exit 0
     fi
+
+    echo -e "\n❌ Stage 1 (Mutation Search) failed to find credentials."
+    read -p "🚀 Would you like to start Phase 2 (Radical 'From Scratch' Search)? (y/n): " start_phase2
+    if [ "$start_phase2" != "y" ]; then
+        echo "Exiting."
+        exit 0
+    fi
+
+    echo "--- 🔥 Phase 2: Radical 'From Scratch' Search ---"
+    rm -rf "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR"
+    
+    # Generate broad pattern passwords without seeds
+    # We double the GEN_COUNT for a broader search
+    PHASE2_COUNT=$(( GEN_COUNT * 2 ))
+    echo "📦 Generating $PHASE2_COUNT unique passwords from scratch (Pattern Search)..."
+    
+    ./bin/hydra-gen -n "$PHASE2_COUNT" > "$TEMP_DIR/scratch_master.txt"
+    
+    # Split for parallel brute force
+    split -n "l/$THREAD_COUNT" "$TEMP_DIR/scratch_master.txt" "$TEMP_DIR/part_"
+    # Rename to .txt for the loop
+    for f in "$TEMP_DIR"/part_*; do mv "$f" "$f.txt"; done
+
+    echo "🔥 Launching broad brute force..."
+    pids_brute=()
+    for f in "$TEMP_DIR"/part_*.txt; do
+        ./bin/hydra-brute "$f" > "${f%.txt}.log" 2>&1 &
+        pids_brute+=($!)
+    done
+
+    # Monitor Phase 2
+    while true; do
+        still_running=0
+        for pid in "${pids_brute[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then ((still_running++)); fi
+        done
+        
+        # Early exit on success
+        found_log=$(grep -l "SUCCESS" "$TEMP_DIR"/*.log 2>/dev/null | head -n 1)
+        if [ -n "$found_log" ]; then
+            for pid in "${pids_brute[@]}"; do kill "$pid" 2>/dev/null; done
+            echo -e "\n🎯 FOUND SUCCESS IN PHASE 2!"
+            grep -h -B 1 "SUCCESS" "$found_log"
+            exit 0
+        fi
+
+        tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F: '{sum+=$2} END {print sum+0}')
+        printf "\r   ⮕  Progress: %d/%d" "$tested_count" "$PHASE2_COUNT"
+        
+        if [ "$still_running" -eq 0 ]; then break; fi
+        sleep 1
+    done
+    
+    echo -e "\n❌ Phase 2 complete. No credentials found."
 fi
