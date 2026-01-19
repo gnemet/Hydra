@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -60,7 +61,7 @@ func main() {
 	}
 	fmt.Printf("--- 🌐 THECUS SIMULATOR (LAN MODE) ---\n")
 	fmt.Printf("Endpoint: http://%s%s/adm/login.php\n", displayHost, port)
-	fmt.Printf("Expected Fields: u_name, u_pwd\n")
+	fmt.Printf("Expected Fields: p_user/username, p_pass/pwd\n")
 	log.Fatal(server.ListenAndServe())
 }
 
@@ -76,9 +77,22 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Thecus field names: u_name, u_pwd
-	username := r.FormValue("u_name")
-	password := r.FormValue("u_pwd")
+	// Logging for debug
+	fmt.Printf("[%s] Login Attempt: ", time.Now().Format("15:04:05"))
+	for k, v := range r.PostForm {
+		fmt.Printf("%s=%v ", k, v)
+	}
+	fmt.Println()
+
+	// Thecus field names can be multiple, we check the main ones
+	username := r.FormValue("p_user")
+	if username == "" {
+		username = r.FormValue("username")
+	}
+	password := r.FormValue("p_pass")
+	if password == "" {
+		password = r.FormValue("pwd")
+	}
 
 	// Simulate old NAS CPU delay
 	time.Sleep(100 * time.Millisecond)
@@ -91,16 +105,20 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "application/json")
 	if isValid {
-		fmt.Fprintf(w, `<html><body>
-			<h1>Thecus N4100 Management</h1>
-			<div id="status">Login Success: Welcome to the Control Panel</div>
-		</body></html>`)
+		resp := map[string]interface{}{
+			"success": true,
+		}
+		json.NewEncoder(w).Encode(resp)
 	} else {
-		fmt.Fprintf(w, `<html><body>
-			<h1>Thecus N4100 Management</h1>
-			<div id="error">Invalid username or password. Please Retry.</div>
-		</body></html>`)
+		resp := map[string]interface{}{
+			"success": false,
+			"errormsg": map[string]string{
+				"title": "Authentication Failed",
+				"msg":   "Invalid username or password.",
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
 	}
 }

@@ -18,7 +18,14 @@ func NewEvaluator(selector string) *Evaluator {
 }
 
 // Elevate extracts data from the HTML based on the target selector.
+// If the content looks like JSON (starts with {), it returns the raw content
+// to allow simple string matching for success/error text.
 func (e *Evaluator) Elevate(htmlContent string) (string, error) {
+	trimmed := strings.TrimSpace(htmlContent)
+	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+		return trimmed, nil
+	}
+
 	doc, err := html.Parse(strings.NewReader(htmlContent))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse HTML: %w", err)

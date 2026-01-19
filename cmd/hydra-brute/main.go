@@ -136,12 +136,28 @@ func main() {
 
 			fmt.Printf("Testing: %s:%s ... ", user, pass)
 
-			data := map[string]string{
-				userField: user,
-				passField: pass,
+			data := make(map[string]string)
+			// Handle multiple user fields
+			for _, field := range strings.Split(userField, ",") {
+				data[strings.TrimSpace(field)] = user
+			}
+			// Handle multiple password fields
+			for _, field := range strings.Split(passField, ",") {
+				data[strings.TrimSpace(field)] = pass
+			}
+			// Handle extra params
+			extraParams := os.Getenv("HYDRA_EXTRA_PARAMS")
+			if extraParams != "" {
+				for _, pair := range strings.Split(extraParams, ",") {
+					parts := strings.SplitN(pair, "=", 2)
+					if len(parts) == 2 {
+						data[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+					}
+				}
 			}
 
 			content, err := f.FetchPost(url, data)
+
 			if err != nil {
 				fmt.Printf("[NETWORK ERROR: %v]\n", err)
 				continue
@@ -172,6 +188,7 @@ func main() {
 				fmt.Printf("❓ UNKNOWN RESPONSE (Potential Success?)\n")
 				fmt.Printf(">> Captured: %s\n", cleanResult)
 			}
+
 		}
 		if found {
 			break

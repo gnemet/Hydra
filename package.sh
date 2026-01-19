@@ -19,7 +19,9 @@ chmod +x "$DIST_DIR/parallel.sh"
 
 # 4. Copy Config & Data
 cp .env "$DIST_DIR/"
+cp thecus.env "$DIST_DIR/" 2>/dev/null || true
 cp users.txt "$DIST_DIR/"
+
 cp passwords.txt "$DIST_DIR/"
 
 # 5. Copy README and Setup
