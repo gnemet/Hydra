@@ -18,7 +18,7 @@ TEMP_DIR=${HYDRA_TEMP_DIR:-"temp_lists"}
 BASE_PASS_FILE=${HYDRA_PASS_FILE:-"passwords.txt"}
 
 # 1. Build
-make build-all
+# make build-all
 
 # 2. Session Management
 echo "--- 🚀 Hydra Parallel Orchestrator (Multi-Seed Generation) ---"
