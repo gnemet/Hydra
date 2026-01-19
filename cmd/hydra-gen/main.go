@@ -63,8 +63,75 @@ func main() {
 	useMutation := flag.Bool("mutate", false, "Use mutation strategies instead of random generation")
 	useSequential := flag.Bool("sequential", false, "Use exhaustive sequential brute force")
 	useCombinatorial := flag.Bool("combine", false, "Combine seeds with each other")
+	usePureBrute := flag.Bool("brute", false, "Exhaustive sequential search based on regex charset")
+	useSmartBrute := flag.Bool("smart", false, "Exhaustive search following human patterns (Upper first, Digit last)")
 	maxRetriesFactor := flag.Int("retries-factor", defMaxRetriesFactor, "Retries factor (max_retries = n * factor)")
+	regexFlag := flag.String("regex", os.Getenv("HYDRA_PASS_REGEX"), "Regex pattern for brute force generation")
 	flag.Parse()
+
+	passRegex = *regexFlag
+
+	var out *os.File = os.Stdout
+	if *outputFile != "" {
+		f, err := os.Create(*outputFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		out = f
+	}
+
+	// 0. SMART BRUTE: Human Patterned Exhaustive (Upper First, Digit Last)
+	if *useSmartBrute {
+		minVal, maxVal := generator.ParseLengthsFromRegex(passRegex)
+		currentMin, currentMax := *minLen, *maxLen
+		if strings.Contains(passRegex, "{") {
+			currentMin, currentMax = minVal, maxVal
+		}
+
+		fmt.Fprintf(os.Stderr, "🧠 Smart Mode: Human Habits (Upper-First, Digit-Last) | Range %d-%d\n", currentMin, currentMax)
+
+		generatedCount := 0
+		for l := currentMin; l <= currentMax; l++ {
+			if l < 2 {
+				continue
+			}
+
+			// Build position charsets
+			posCharsets := make([]string, l)
+			// Pos 0: Strictly Uppercase (User request)
+			posCharsets[0] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			// Last Pos: Strictly Digits (User request)
+			posCharsets[l-1] = "0123456789"
+			// Middle: Lower + Specials
+			for i := 1; i < l-1; i++ {
+				posCharsets[i] = "abcdefghijklmnopqrstuvwxyz!@#_-"
+			}
+
+			it := generator.NewPatternedSequentialIterator(posCharsets)
+			for {
+				p, ok := it.Next()
+				if !ok {
+					break
+				}
+				fmt.Fprintln(out, *prefix+p)
+				generatedCount++
+				if *count > 0 && generatedCount >= *count {
+					return
+				}
+			}
+		}
+		return
+	}
+
+	// 0. PURE BRUTE: Exhaustive sequential search based on regex (Tier 3 Escalation)
+	if *usePureBrute {
+		segments := generator.ParseSegmentedRegex(passRegex)
+
+		runSegmentedBrute(out, segments, *count, *prefix)
+		return
+	}
 
 	var basePasswords []string
 	if *simPass != "" {
@@ -82,17 +149,6 @@ func main() {
 				}
 			}
 		}
-	}
-
-	var out *os.File = os.Stdout
-	if *outputFile != "" {
-		f, err := os.Create(*outputFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
-			os.Exit(1)
-		}
-		defer f.Close()
-		out = f
 	}
 
 	var compiledRegex *regexp.Regexp
@@ -243,4 +299,49 @@ func getEnvFloat(key string, fallback float64) float64 {
 		}
 	}
 	return fallback
+}
+
+func runSegmentedBrute(out *os.File, segments []generator.RegexSegment, count int, prefix string) {
+	lengths := make([]int, len(segments))
+	generatedCount := 0
+
+	var iterateLengths func(int) bool
+	iterateLengths = func(segIdx int) bool {
+		if segIdx == len(segments) {
+			// Construct posCharsets
+			var posCharsets []string
+			for i, s := range segments {
+				for j := 0; j < lengths[i]; j++ {
+					posCharsets = append(posCharsets, s.Charset)
+				}
+			}
+			if len(posCharsets) == 0 {
+				return false
+			}
+
+			it := generator.NewPatternedSequentialIterator(posCharsets)
+			for {
+				p, ok := it.Next()
+				if !ok {
+					break
+				}
+				fmt.Fprintln(out, prefix+p)
+				generatedCount++
+				if count > 0 && generatedCount >= count {
+					return true // Signal stop
+				}
+			}
+			return false
+		}
+
+		for l := segments[segIdx].Min; l <= segments[segIdx].Max; l++ {
+			lengths[segIdx] = l
+			if iterateLengths(segIdx + 1) {
+				return true
+			}
+		}
+		return false
+	}
+
+	iterateLengths(0)
 }

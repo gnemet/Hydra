@@ -36,6 +36,7 @@ func main() {
 
 	passRegex := os.Getenv("HYDRA_PASS_REGEX")
 	genCountStr := os.Getenv("HYDRA_GEN_COUNT")
+	prefix := os.Getenv("HYDRA_PREFIX")
 
 	if url == "" || selector == "" {
 		log.Fatal("HYDRA_URL and HYDRA_TARGET_SELECTOR must be set in .env")
@@ -80,20 +81,55 @@ func main() {
 	}
 
 	// Dynamic runtime generation - only if no password list was provided
+	bruteMode := os.Getenv("HYDRA_BRUTE_MODE") == "true"
 	if len(passwords) == 0 && passRegex != "" && genCount > 0 {
-		fmt.Printf("Dynamic generation enabled: %s (Count: %d, Range: %d-%d)\n", passRegex, genCount, defMin, defMax)
-		for i := 0; i < genCount; i++ {
-			var p string
-			// Detect if strictly following the 4-char block pattern
-			if strings.Contains(passRegex, "([a-z][A-Z][0-9][_])") {
-				// For blocks, we translate length to block count if reasonable,
-				// but here we keep simple logic or use the parsed length as block count if that's the intent.
-				// Based on internal/generator, blocks = length param.
-				p, _ = generator.GenerateByBlockPattern(defMin, defMax)
-			} else {
-				p, _ = generator.GenerateVaried(defMin, defMax)
+		if bruteMode {
+			charset := generator.ParseCharsetFromRegex(passRegex)
+			minLen, maxLen := generator.ParseLengthsFromRegex(passRegex)
+
+			// Adjust for prefix
+			adjMin := minLen - len(prefix)
+			adjMax := maxLen - len(prefix)
+			if adjMin < 0 {
+				adjMin = 0
 			}
-			passwords = append(passwords, p)
+			if adjMax < adjMin {
+				adjMax = adjMin
+			}
+
+			fmt.Printf("💎 Pure Brute Mode: Systematic exhaustion of %s (Range: %d-%d, Prefix: %s)\n", passRegex, adjMin+len(prefix), adjMax+len(prefix), prefix)
+
+			it := generator.NewSequentialIterator(charset, adjMin, adjMax)
+			count := 0
+			for {
+				p, ok := it.Next()
+				if !ok || count >= genCount {
+					break
+				}
+				passwords = append(passwords, prefix+p)
+				count++
+			}
+		} else {
+			// Adjust for prefix
+			adjMin := defMin - len(prefix)
+			adjMax := defMax - len(prefix)
+			if adjMin < 0 {
+				adjMin = 0
+			}
+			if adjMax < adjMin {
+				adjMax = adjMin
+			}
+
+			fmt.Printf("🎲 Random Variation Mode: %s (Count: %d, Range: %d-%d, Prefix: %s)\n", passRegex, adjMin+len(prefix), adjMax+len(prefix), prefix)
+			for i := 0; i < genCount; i++ {
+				var p string
+				if strings.Contains(passRegex, "([a-z][A-Z][0-9][_])") {
+					p, _ = generator.GenerateByBlockPattern(adjMin, adjMax)
+				} else {
+					p, _ = generator.GenerateVaried(adjMin, adjMax)
+				}
+				passwords = append(passwords, prefix+p)
+			}
 		}
 	}
 

@@ -84,7 +84,7 @@ echo "Found $num_seeds base seeds in $BASE_PASS_FILE."
 per_seed=$(( (GEN_COUNT + num_seeds - 1) / num_seeds ))
 
 # 4. Parallel Generation (One thread per seed)
-if [ "$SKIP_GEN" = false ]; then
+if [ "$SKIP_GEN" = false ] && [ "$HYDRA_BRUTE_MODE" != "true" ] && [ "$HYDRA_SMART_MODE" != "true" ]; then
     echo "📦 Phase 1/2: Generating passwords..."
     T1_START=$(date +%s)
     pids_gen=()
@@ -121,6 +121,14 @@ if [ "$SKIP_GEN" = false ]; then
     T1_END=$(date +%s)
     T1_DUR=$(( T1_END - T1_START ))
     echo -e "\n✅ Generation Complete. (Duration: ${T1_DUR}s)"
+elif [ "$HYDRA_BRUTE_MODE" = "true" ]; then
+    echo "⏩ Skipping Phase 1 (Pure Brute Mode enabled)."
+    # We will trigger the exhaustive search in Phase 2 logic or just let the loop handle it
+    # For Pure Brute, we immediately jump to the 'From Scratch' logic but as the main phase
+    BRUTE_ONLY=true
+elif [ "$HYDRA_SMART_MODE" = "true" ]; then
+    echo "⏩ Skipping Phase 1 (Smart Human Pattern Mode enabled)."
+    SMART_ONLY=true
 else
     echo "⏩ Skipping Phase 1 (Reusable wordlists found)."
 fi
@@ -132,7 +140,31 @@ if [[ "$TARGET_IP" != "localhost" ]] && ! lsof -i:8082 > /dev/null; then
     echo "🌐 Note: Local test server not started (Target is remote)."
 fi
 
-# 6. Launch Parallel Brute Force
+# 6. Prepare wordlists
+if [ "$BRUTE_ONLY" = "true" ] && [ "$SKIP_GEN" = false ]; then
+    echo "--- 🔥 Pure Brute Mode: Generating exhaustive wordlist ---"
+    rm -rf "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR"
+    ./bin/hydra-gen -brute -n "$GEN_COUNT" > "$TEMP_DIR/brute_master.txt"
+    split -n "l/$THREAD_COUNT" "$TEMP_DIR/brute_master.txt" "$TEMP_DIR/part_"
+    for f in "$TEMP_DIR"/part_*; do mv "$f" "$f.txt"; done
+elif [ "$SMART_ONLY" = "true" ] && [ "$SKIP_GEN" = false ]; then
+    echo "--- 🧠 Smart Mode: Generating human-pattern wordlist ---"
+    rm -rf "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR"
+    ./bin/hydra-gen -smart -n "$GEN_COUNT" > "$TEMP_DIR/smart_master.txt"
+    split -n "l/$THREAD_COUNT" "$TEMP_DIR/smart_master.txt" "$TEMP_DIR/part_"
+    for f in "$TEMP_DIR"/part_*; do mv "$f" "$f.txt"; done
+fi
+
+# 7. Launch Parallel Brute Force
+# Check if we actually have files to work with
+EXISTING_FILES=$(ls "$TEMP_DIR"/part_*.txt 2>/dev/null | grep -v "\.log" | wc -l)
+if [ "$EXISTING_FILES" -eq 0 ]; then
+    echo "❌ Error: No wordlist parts found in $TEMP_DIR. Try running a fresh session (-n n)."
+    exit 1
+fi
+
 TOTAL_FOR_BRUTE=$(cat "$TEMP_DIR"/part_*.txt 2>/dev/null | wc -l)
 echo "🔥 Phase 2/2: Launching brute force ($TOTAL_FOR_BRUTE passwords)..."
 T2_START=$(date +%s)
@@ -218,7 +250,7 @@ else
     PHASE2_COUNT=$(( GEN_COUNT * 2 ))
     echo "📦 Generating $PHASE2_COUNT unique passwords sequentially from scratch (Exhaustive)..."
     
-    ./bin/hydra-gen -n "$PHASE2_COUNT" -sequential > "$TEMP_DIR/scratch_master.txt"
+    ./bin/hydra-gen -n "$PHASE2_COUNT" -brute > "$TEMP_DIR/scratch_master.txt"
     
     # Split for parallel brute force
     split -n "l/$THREAD_COUNT" "$TEMP_DIR/scratch_master.txt" "$TEMP_DIR/part_"

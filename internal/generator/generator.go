@@ -3,7 +3,16 @@ package generator
 import (
 	"crypto/rand"
 	"math/big"
+	"regexp"
+	"strconv"
+	"strings"
 )
+
+type RegexSegment struct {
+	Charset string
+	Min     int
+	Max     int
+}
 
 const (
 	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
@@ -89,7 +98,7 @@ func Mutate(seed string, minLen, maxLen int) (string, error) {
 	// Apply 1 to 3 random mutations to increase the state space
 	numMuts, _ := rand.Int(rand.Reader, big.NewInt(3))
 	for i := 0; i <= int(numMuts.Int64()); i++ {
-		strategy, _ := rand.Int(rand.Reader, big.NewInt(8)) // Increased to 8 strategies
+		strategy, _ := rand.Int(rand.Reader, big.NewInt(11))
 		switch strategy.Int64() {
 		case 0: // Variations in case: Randomly toggle case of letters
 			for j, r := range mut {
@@ -142,6 +151,19 @@ func Mutate(seed string, minLen, maxLen int) (string, error) {
 					mut[idx] = mut[idx] - 'a' + 'A'
 				}
 			}
+		case 8: // Double Suffix (Digit + Special Char)
+			digit := digitChars[getRandIdxString(digitChars)]
+			special := specChars[getRandIdxString(specChars)]
+			mut = append(mut, rune(digit), rune(special))
+		case 9: // Prepend/Append years for legacy devices (1990-2010)
+			years := []string{"1998", "1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010"}
+			yIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(years))))
+			mut = append(mut, []rune(years[yIdx.Int64()])...)
+		case 10: // Add padding characters
+			pads := []string{"---", "___", "...", "!!!"}
+			pIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(pads))))
+			mut = append([]rune(pads[pIdx.Int64()]), mut...)
+			mut = append(mut, []rune(pads[pIdx.Int64()])...)
 		}
 	}
 
@@ -234,6 +256,50 @@ func (it *SequentialIterator) Next() (string, bool) {
 	return string(res), true
 }
 
+// PatternedSequentialIterator supports different charsets for different positions
+type PatternedSequentialIterator struct {
+	charsets [][]rune
+	indices  []int
+	done     bool
+}
+
+func NewPatternedSequentialIterator(posCharsets []string) *PatternedSequentialIterator {
+	charsets := make([][]rune, len(posCharsets))
+	for i, s := range posCharsets {
+		charsets[i] = []rune(s)
+	}
+	return &PatternedSequentialIterator{
+		charsets: charsets,
+		indices:  make([]int, len(posCharsets)),
+	}
+}
+
+func (it *PatternedSequentialIterator) Next() (string, bool) {
+	if it.done {
+		return "", false
+	}
+
+	// Build current string
+	res := make([]rune, len(it.indices))
+	for i, idx := range it.indices {
+		res[i] = it.charsets[i][idx]
+	}
+
+	// Increment indices
+	for i := len(it.indices) - 1; i >= 0; i-- {
+		it.indices[i]++
+		if it.indices[i] < len(it.charsets[i]) {
+			return string(res), true
+		}
+		it.indices[i] = 0
+		if i == 0 {
+			it.done = true
+		}
+	}
+
+	return string(res), true
+}
+
 // CalculateComplexity returns a score (lower is weaker/simpler).
 // Weakest: all lowercase, short.
 // Stronger: mixed case, numbers at end, special characters, longer.
@@ -273,4 +339,113 @@ func CalculateComplexity(p string) int {
 	}
 
 	return score
+}
+
+// ParseCharsetFromRegex extracts a flat charset from a simple [a-zA-Z] style regex
+func ParseCharsetFromRegex(regex string) string {
+	if regex == "" {
+		return commonChars
+	}
+
+	// Simple heuristic: find content between brackets
+	start := 0
+	for i, r := range regex {
+		if r == '[' {
+			start = i + 1
+			break
+		}
+	}
+	end := len(regex)
+	for i := len(regex) - 1; i >= 0; i-- {
+		if regex[i] == ']' {
+			end = i
+			break
+		}
+	}
+
+	if start >= end {
+		return commonChars
+	}
+
+	content := regex[start:end]
+	res := ""
+	for i := 0; i < len(content); i++ {
+		if i+2 < len(content) && content[i+1] == '-' {
+			// Range detected: a-z, A-Z, 0-9
+			for c := content[i]; c <= content[i+2]; c++ {
+				res += string(c)
+			}
+			i += 2
+		} else {
+			res += string(content[i])
+		}
+	}
+
+	// Deduplicate
+	seenChar := make(map[rune]bool)
+	final := ""
+	for _, r := range res {
+		if !seenChar[r] {
+			final += string(r)
+			seenChar[r] = true
+		}
+	}
+
+	return final
+}
+
+// ParseLengthsFromRegex extracts total {min,max} or {n} from a regex across all segments
+func ParseLengthsFromRegex(regex string) (int, int) {
+	segments := ParseSegmentedRegex(regex)
+	if len(segments) == 0 {
+		return 6, 10
+	}
+
+	totalMin, totalMax := 0, 0
+	for _, s := range segments {
+		totalMin += s.Min
+		totalMax += s.Max
+	}
+	return totalMin, totalMax
+}
+
+// ParseSegmentedRegex splits a complex regex into individual segments
+func ParseSegmentedRegex(regex string) []RegexSegment {
+	// Matches like [a-z]{1,2} or [A-Z]
+	re := regexp.MustCompile(`\[([^\]]+)\](?:\{([^\}]*)\})?`)
+	matches := re.FindAllStringSubmatch(regex, -1)
+
+	var segments []RegexSegment
+	for _, m := range matches {
+		charsetPart := "[" + m[1] + "]"
+		charset := ParseCharsetFromRegex(charsetPart)
+
+		min, max := 1, 1 // Default
+		if m[2] != "" {
+			parts := strings.Split(m[2], ",")
+			if len(parts) == 2 {
+				if parts[0] == "" {
+					min = 0
+				} else {
+					min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+				}
+
+				if len(parts) > 1 && parts[1] != "" {
+					max, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
+				} else {
+					max = min
+				}
+			} else {
+				min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+				max = min
+			}
+		}
+		segments = append(segments, RegexSegment{Charset: charset, Min: min, Max: max})
+	}
+	// If no segments found, return a default
+	if len(segments) == 0 {
+		// Try to fallback to the old simple search if it doesn't match [..] pattern
+		// but for now we expect [..]
+	}
+	return segments
 }
