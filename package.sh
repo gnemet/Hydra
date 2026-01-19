@@ -16,7 +16,8 @@ cp bin/* "$DIST_DIR/bin/"
 # 3. Copy Scripts
 cp parallel.sh "$DIST_DIR/"
 cp setup_remote.sh "$DIST_DIR/"
-chmod +x "$DIST_DIR/parallel.sh" "$DIST_DIR/setup_remote.sh"
+cp pull_latest.sh "$DIST_DIR/"
+chmod +x "$DIST_DIR/parallel.sh" "$DIST_DIR/setup_remote.sh" "$DIST_DIR/pull_latest.sh"
 
 # 4. Copy Config & Data
 cp .env "$DIST_DIR/"
