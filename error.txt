@@ -1,18 +1,43 @@
-nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$ ls
-README.md                    passwords.txt                  thecus.env:Zone.Identifier
-README.md:Zone.Identifier    passwords.txt:Zone.Identifier  users.txt
-bin                          setup.md                       users.txt:Zone.Identifier
-parallel.sh                  setup.md:Zone.Identifier
-parallel.sh:Zone.Identifier  thecus.env
+nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$ nano parallel.sh
 nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$ ./parallel.sh thecus.env
 📂 Loading configuration from thecus.env
-./parallel.sh: line 21: make: command not found
 --- 🚀 Hydra Parallel Orchestrator (Multi-Seed Generation) ---
-♻️  Resume last session? (y/N):
+♻️  Resume last session? (y/N): n
 🗑️  Starting fresh session.
 Target: http://192.168.1.250/adm/login.php
 Local LAN IP: 172.26.209.66
 LAN Access: http://172.26.209.66:8082
 🔍 Checking connectivity to 192.168.1.250...
 ⚠️  Warning: URL http://192.168.1.250/adm/login.php seems unreachable (No HTTP response).
-Continue anyway? (y/n):
+Continue anyway? (y/n): ^C
+nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$ ./parallel.sh thecus.env
+📂 Loading configuration from thecus.env
+--- 🚀 Hydra Parallel Orchestrator (Multi-Seed Generation) ---
+♻️  Resume last session? (y/N): y
+♻️  Resuming session. Skipping password generation.
+Target: http://192.168.1.250/adm/login.php
+Local LAN IP: 172.26.209.66
+LAN Access: http://172.26.209.66:8082
+🔍 Checking connectivity to 192.168.1.250...
+⚠️  Warning: URL http://192.168.1.250/adm/login.php seems unreachable (No HTTP response).
+Continue anyway? (y/n): y
+Found 12 base seeds in passwords.txt.
+⏩ Skipping Phase 1 (Reusable wordlists found).
+🌐 Note: Local test server not started (Target is remote).
+🔥 Phase 2/2: Launching brute force (0 passwords)...
+   > Progress: [                              ] 0% (0/0)
+✅ Brute Force Phase Complete. (Duration: 0s)
+
+----------------------------------------
+✅ Parallel Scan Complete.
+grep: temp_lists/*.log: No such file or directory
+
+❌ Stage 1 (Mutation Search) failed to find credentials.
+🚀 Would you like to start Phase 2 (Radical 'From Scratch' Search)? (y/n): y
+--- 🔥 Phase 2: Radical 'From Scratch' Search ---
+📦 Generating 2000 unique passwords sequentially from scratch (Exhaustive)...
+./parallel.sh: line 221: ./bin/hydra-gen: Permission denied
+🔥 Launching broad brute force...
+   > Progress: 0/2000
+❌ Phase 2 complete. No credentials found. (Duration: 1s)
+nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$
