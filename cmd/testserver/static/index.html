@@ -1,74 +1,260 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hydra Test - Secure Portal</title>
-    <link rel="stylesheet" href="vendor/css/inter.css">
-    <link rel="stylesheet" href="vendor/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
-    <script src="vendor/js/htmx.min.js"></script>
-    <script src="vendor/js/jquery.min.js"></script>
+    <title>Thecus N4100Pro Landing</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .logo-container {
+            margin-bottom: 50px;
+            text-align: center;
+        }
+
+        .icons-container {
+            display: flex;
+            gap: 40px;
+        }
+
+        .icon-btn {
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .icon-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .icon-img {
+            width: 100px;
+            height: 85px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .label {
+            font-size: 14px;
+        }
+
+        /* Modal Style */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .window {
+            background: #333;
+            border: 2px solid #555;
+            padding: 20px;
+            width: 341px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .header {
+            background: #444;
+            margin: -20px -20px 20px -20px;
+            padding: 10px;
+            font-weight: bold;
+            border-bottom: 1px solid #555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .close-btn {
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        .field {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+        }
+
+        .footer {
+            text-align: right;
+            margin-top: 20px;
+        }
+
+        button {
+            background: #555;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        button:hover {
+            background: #666;
+        }
+
+        #response {
+            margin-top: 15px;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 2px;
+            display: none;
+        }
+
+        .success {
+            background: #1b4332;
+            color: #74c69d;
+        }
+
+        .error {
+            background: #590d22;
+            color: #ff4d6d;
+        }
+    </style>
 </head>
 
-<body class="dark-theme">
-    <div class="background-overlay"></div>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
+<body>
 
-    <main class="login-container">
-        <header class="login-header">
-            <div class="logo">
-                <i class="fas fa-dragon"></i>
-                <h1>HYDRA<span>TEST</span></h1>
-            </div>
-            <p>Enter your credentials to access the secure node.</p>
-        </header>
+    <div class="logo-container">
+        <h1 style="color: #999; font-size: 24px;">Thecus <span style="color: #fff;">N4100Pro</span></h1>
+    </div>
 
-        <form id="login-form" hx-post="/login" hx-target="#response-container" hx-swap="innerHTML"
-            hx-indicator="#loading">
-
-            <div class="input-group">
-                <label for="username">Identity</label>
-                <div class="input-wrapper">
-                    <i class="far fa-user"></i>
-                    <input type="text" id="username" name="username" placeholder="Username" required>
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label for="password">Access Code</label>
-                <div class="input-wrapper">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="password" name="password" placeholder="••••••••" required>
-                </div>
-            </div>
-
-            <button type="submit" class="btn-submit">
-                <span>Engage Authentication</span>
-                <i class="fas fa-arrow-right"></i>
-            </button>
-
-            <div id="loading" class="htmx-indicator">
-                <div class="spinner"></div>
-                Verifying Credentials...
-            </div>
-        </form>
-
-        <div id="response-container">
-            <!-- Results will appear here -->
+    <div class="icons-container">
+        <div class="icon-btn" onclick="openLogin('Admin')">
+            <div class="icon-img">ADMIN</div>
+            <div class="label">Admin</div>
         </div>
+        <div class="icon-btn" onclick="alert('Web Disk is not simulated')">
+            <div class="icon-img">DISK</div>
+            <div class="label">Web Disk</div>
+        </div>
+        <div class="icon-btn" onclick="alert('Photo Server is not simulated')">
+            <div class="icon-img">PHOTO</div>
+            <div class="label">Photo Server</div>
+        </div>
+    </div>
 
-        <footer class="login-footer">
-            <button id="theme-toggle" class="btn-icon">
-                <i class="fas fa-moon"></i>
-            </button>
-            <span>v1.0.4-beta</span>
-        </footer>
-    </main>
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="window">
+            <div class="header">
+                <span id="modalTitle">Admin</span>
+                <span class="close-btn" onclick="closeLogin()">[X]</span>
+            </div>
+            <form id="loginForm">
+                <div class="field" id="usernameField">
+                    <label>Username</label>
+                    <input type="text" name="u_name" id="u_name" value="admin">
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="u_pwd" id="u_pwd" placeholder="••••••••" autofocus>
+                </div>
+                <div class="footer">
+                    <button type="submit">Login</button>
+                </div>
+            </form>
+            <div id="response"></div>
+        </div>
+    </div>
 
-    <script src="script.js"></script>
+    <script>
+        function openLogin(type) {
+            document.getElementById('modalOverlay').style.display = 'flex';
+            document.getElementById('modalTitle').innerText = type;
+            if (type === 'Admin') {
+                document.getElementById('u_name').value = 'admin';
+                document.getElementById('u_name').readOnly = true;
+                document.getElementById('u_name').style.background = '#111';
+            } else {
+                document.getElementById('u_name').readOnly = false;
+                document.getElementById('u_name').style.background = '#222';
+            }
+            document.getElementById('u_pwd').focus();
+        }
+
+        function closeLogin() {
+            document.getElementById('modalOverlay').style.display = 'none';
+            document.getElementById('response').style.display = 'none';
+        }
+
+        document.getElementById('loginForm').onsubmit = function (e) {
+            e.preventDefault();
+            const user = document.getElementById('u_name').value;
+            const pwd = document.getElementById('u_pwd').value;
+            const resDiv = document.getElementById('response');
+
+            const params = new URLSearchParams();
+            params.append('u_name', user);
+            params.append('u_pwd', pwd);
+
+            fetch('/adm/login.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            })
+                .then(res => res.json())
+                .then(data => {
+                    resDiv.style.display = 'block';
+                    if (data.success) {
+                        resDiv.className = 'success';
+                        resDiv.innerText = 'SUCCESS: Logged in!';
+                    } else {
+                        resDiv.className = 'error';
+                        resDiv.innerText = 'FAILED: ' + data.errormsg.msg;
+                    }
+                })
+                .catch(err => {
+                    resDiv.style.display = 'block';
+                    resDiv.className = 'error';
+                    resDiv.innerText = 'NETWORK ERROR: ' + err.message;
+                });
+        };
+    </script>
+
 </body>
 
 </html>

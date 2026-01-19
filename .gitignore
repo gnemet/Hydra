@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+*.zip
+*.tar.gz
 
 # all logs  
 **/*.log
@@ -30,8 +32,6 @@ bin/
 /hydra-brute
 /hydra-gen
 .env
-master_passwords.txt
-users.txt
 /temp_lists
 /temp_overdrive
 /hydra_dist/
