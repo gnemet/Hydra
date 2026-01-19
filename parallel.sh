@@ -60,7 +60,7 @@ if [[ "$TARGET_IP" != "localhost" ]]; then
     fi
 fi
 
-if ! curl -s --head --connect-timeout 2 "$HYDRA_URL" > /dev/null; then
+if ! curl -s -k --connect-timeout 5 "$HYDRA_URL" > /dev/null; then
     echo "⚠️  Warning: URL $HYDRA_URL seems unreachable (No HTTP response)."
     read -p "Continue anyway? (y/n): " cont
     if [ "$cont" != "y" ]; then exit 1; fi
