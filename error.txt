@@ -1,0 +1,18 @@
+nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$ ls
+README.md                    passwords.txt                  thecus.env:Zone.Identifier
+README.md:Zone.Identifier    passwords.txt:Zone.Identifier  users.txt
+bin                          setup.md                       users.txt:Zone.Identifier
+parallel.sh                  setup.md:Zone.Identifier
+parallel.sh:Zone.Identifier  thecus.env
+nemetg@IT-2411:~/hydra_v1.1.2_thecus/hydra_dist$ ./parallel.sh thecus.env
+📂 Loading configuration from thecus.env
+./parallel.sh: line 21: make: command not found
+--- 🚀 Hydra Parallel Orchestrator (Multi-Seed Generation) ---
+♻️  Resume last session? (y/N):
+🗑️  Starting fresh session.
+Target: http://192.168.1.250/adm/login.php
+Local LAN IP: 172.26.209.66
+LAN Access: http://172.26.209.66:8082
+🔍 Checking connectivity to 192.168.1.250...
+⚠️  Warning: URL http://192.168.1.250/adm/login.php seems unreachable (No HTTP response).
+Continue anyway? (y/n):
