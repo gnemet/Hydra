@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
+	envFile := flag.String("env", ".env", "Path to .env file")
 
 	// Default values from environment or fallback
 	defCount := getEnvInt("HYDRA_GEN_COUNT", 10)
@@ -24,28 +24,15 @@ func main() {
 
 	passRegex := os.Getenv("HYDRA_PASS_REGEX")
 	if passRegex != "" {
-		if start := strings.Index(passRegex, "{"); start != -1 {
-			if end := strings.Index(passRegex, "}"); end != -1 {
-				parts := strings.Split(passRegex[start+1:end], ",")
-				if len(parts) == 2 {
-					if min, err := strconv.Atoi(parts[0]); err == nil {
-						defMin = min
-					}
-					if max, err := strconv.Atoi(parts[1]); err == nil {
-						defMax = max
-					}
-				} else if len(parts) == 1 {
-					if n, err := strconv.Atoi(parts[0]); err == nil {
-						defMin = n
-						defMax = n
-					}
-				}
-			}
-		}
+		defMin, defMax = generator.ParseLengthsFromRegex(passRegex)
 	}
 
 	defPattern := getEnvBool("HYDRA_USE_PATTERN", false)
 	defSimFile := os.Getenv("HYDRA_SIMILARITY_FILE")
+	if defSimFile == "" {
+		// Fallback to main pass file if similarity file not specified
+		defSimFile = os.Getenv("HYDRA_PASS_FILE")
+	}
 	defThreshold := getEnvFloat("HYDRA_SIMILARITY_THRESHOLD", 0.0)
 	defPrefix := os.Getenv("HYDRA_PREFIX")
 
@@ -66,9 +53,17 @@ func main() {
 	usePureBrute := flag.Bool("brute", false, "Exhaustive sequential search based on regex charset")
 	useSmartBrute := flag.Bool("smart", false, "Exhaustive search following human patterns (Upper first, Digit last)")
 	maxRetriesFactor := flag.Int("retries-factor", defMaxRetriesFactor, "Retries factor (max_retries = n * factor)")
-	regexFlag := flag.String("regex", os.Getenv("HYDRA_PASS_REGEX"), "Regex pattern for brute force generation")
+	regexFlag := flag.String("regex", "", "Regex pattern for brute force generation")
 	flag.Parse()
 
+	_ = godotenv.Load(*envFile)
+	if *envFile != ".env" {
+		_ = godotenv.Load() // Also try default
+	}
+
+	if *regexFlag == "" {
+		*regexFlag = os.Getenv("HYDRA_PASS_REGEX")
+	}
 	passRegex = *regexFlag
 
 	var out *os.File = os.Stdout
@@ -80,57 +75,6 @@ func main() {
 		}
 		defer f.Close()
 		out = f
-	}
-
-	// 0. SMART BRUTE: Human Patterned Exhaustive (Upper First, Digit Last)
-	if *useSmartBrute {
-		minVal, maxVal := generator.ParseLengthsFromRegex(passRegex)
-		currentMin, currentMax := *minLen, *maxLen
-		if strings.Contains(passRegex, "{") {
-			currentMin, currentMax = minVal, maxVal
-		}
-
-		fmt.Fprintf(os.Stderr, "🧠 Smart Mode: Human Habits (Upper-First, Digit-Last) | Range %d-%d\n", currentMin, currentMax)
-
-		generatedCount := 0
-		for l := currentMin; l <= currentMax; l++ {
-			if l < 2 {
-				continue
-			}
-
-			// Build position charsets
-			posCharsets := make([]string, l)
-			// Pos 0: Strictly Uppercase (User request)
-			posCharsets[0] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-			// Last Pos: Strictly Digits (User request)
-			posCharsets[l-1] = "0123456789"
-			// Middle: Lower + Specials
-			for i := 1; i < l-1; i++ {
-				posCharsets[i] = "abcdefghijklmnopqrstuvwxyz!@#_-"
-			}
-
-			it := generator.NewPatternedSequentialIterator(posCharsets)
-			for {
-				p, ok := it.Next()
-				if !ok {
-					break
-				}
-				fmt.Fprintln(out, *prefix+p)
-				generatedCount++
-				if *count > 0 && generatedCount >= *count {
-					return
-				}
-			}
-		}
-		return
-	}
-
-	// 0. PURE BRUTE: Exhaustive sequential search based on regex (Tier 3 Escalation)
-	if *usePureBrute {
-		segments := generator.ParseSegmentedRegex(passRegex)
-
-		runSegmentedBrute(out, segments, *count, *prefix)
-		return
 	}
 
 	var basePasswords []string
@@ -151,9 +95,45 @@ func main() {
 		}
 	}
 
+	// 0. SMART BRUTE: Human Patterned Randomized (Uses regex segments)
+	if *useSmartBrute {
+		minVal, maxVal := generator.ParseLengthsFromRegex(passRegex)
+		currentMin, currentMax := *minLen, *maxLen
+		if strings.Contains(passRegex, "{") || strings.Contains(passRegex, "[") {
+			currentMin, currentMax = minVal, maxVal
+		}
+
+		fmt.Fprintf(os.Stderr, "🧠 Smart Mode: Using Regex Segments | Range %d-%d\n", currentMin, currentMax)
+
+		segments := generator.ParseSegmentedRegex(passRegex)
+		generatedCount := 0
+		maxRetries := *count * 10
+		retries := 0
+
+		for generatedCount < *count && retries < maxRetries {
+			retries++
+			p := generator.GenerateRandomPatternedWithSeeds(segments, basePasswords)
+			if len(p) >= currentMin && len(p) <= currentMax {
+				fmt.Fprintln(out, *prefix+p)
+				generatedCount++
+			}
+		}
+		return
+	}
+
+	// 0. PURE BRUTE: Exhaustive sequential search based on regex (Tier 3 Escalation)
+	if *usePureBrute {
+		segments := generator.ParseSegmentedRegex(passRegex)
+		generator.RunSegmentedBrute(segments, *count, *prefix, func(p string) {
+			fmt.Fprintln(out, p)
+		})
+		return
+	}
+
 	var compiledRegex *regexp.Regexp
 	if passRegex != "" {
-		compiledRegex, _ = regexp.Compile("^" + passRegex + "$")
+		cleanPattern := generator.CleanRegex(passRegex)
+		compiledRegex, _ = regexp.Compile("^" + cleanPattern + "$")
 	}
 
 	generatedCount := 0
@@ -299,49 +279,4 @@ func getEnvFloat(key string, fallback float64) float64 {
 		}
 	}
 	return fallback
-}
-
-func runSegmentedBrute(out *os.File, segments []generator.RegexSegment, count int, prefix string) {
-	lengths := make([]int, len(segments))
-	generatedCount := 0
-
-	var iterateLengths func(int) bool
-	iterateLengths = func(segIdx int) bool {
-		if segIdx == len(segments) {
-			// Construct posCharsets
-			var posCharsets []string
-			for i, s := range segments {
-				for j := 0; j < lengths[i]; j++ {
-					posCharsets = append(posCharsets, s.Charset)
-				}
-			}
-			if len(posCharsets) == 0 {
-				return false
-			}
-
-			it := generator.NewPatternedSequentialIterator(posCharsets)
-			for {
-				p, ok := it.Next()
-				if !ok {
-					break
-				}
-				fmt.Fprintln(out, prefix+p)
-				generatedCount++
-				if count > 0 && generatedCount >= count {
-					return true // Signal stop
-				}
-			}
-			return false
-		}
-
-		for l := segments[segIdx].Min; l <= segments[segIdx].Max; l++ {
-			lengths[segIdx] = l
-			if iterateLengths(segIdx + 1) {
-				return true
-			}
-		}
-		return false
-	}
-
-	iterateLengths(0)
 }

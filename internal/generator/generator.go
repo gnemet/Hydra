@@ -9,16 +9,18 @@ import (
 )
 
 type RegexSegment struct {
-	Charset string
-	Min     int
-	Max     int
+	Charset  string
+	Literal  string
+	Variants []RegexSegment // For alternation (a|b|c)
+	Min      int
+	Max      int
 }
 
 const (
 	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
 	upperChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digitChars  = "0123456789"
-	specChars   = "!@#_-"
+	specChars   = "!@#_-$"
 	commonChars = lowerChars + upperChars + digitChars + specChars
 )
 
@@ -257,6 +259,7 @@ func (it *SequentialIterator) Next() (string, bool) {
 }
 
 // PatternedSequentialIterator supports different charsets for different positions
+// PatternedSequentialIterator keeps track of the state for exhaustive brute force with specific charsets per position
 type PatternedSequentialIterator struct {
 	charsets [][]rune
 	indices  []int
@@ -300,6 +303,208 @@ func (it *PatternedSequentialIterator) Next() (string, bool) {
 	return string(res), true
 }
 
+// GenerateRandomPatterned generates a single random string matching the position-based charsets
+func GenerateRandomPatterned(segments []RegexSegment) string {
+	res := ""
+	for _, s := range segments {
+		res += s.GenerateRandom()
+	}
+	return res
+}
+
+// GenerateRandomPatternedWithSeeds injects a random seed into the generation
+func GenerateRandomPatternedWithSeeds(segments []RegexSegment, seeds []string) string {
+	if len(seeds) == 0 {
+		return GenerateRandomPatterned(segments)
+	}
+
+	idx, _ := GetRandIdx(int64(len(seeds)))
+	seed := seeds[idx]
+	mutatedSeed := []rune(RandomizeCase(seed))
+
+	res := ""
+	for _, s := range segments {
+		if s.IsWordLike() && len(mutatedSeed) > 0 {
+			take := s.Min
+			if s.Max > take || s.Max < 0 {
+				// If this is a multi-char segment, let it consume the rest of the seed or at least a good chunk
+				if s.Max > 2 || s.Max < 0 {
+					take = len(mutatedSeed)
+				} else if s.Max > take {
+					take = s.Max
+				}
+			}
+			if take > len(mutatedSeed) {
+				take = len(mutatedSeed)
+			}
+			if take < s.Min {
+				take = s.Min // respect Min if possible, will be filled by randoms below if seed is short
+			}
+
+			if take > 0 && len(mutatedSeed) >= take {
+				res += string(mutatedSeed[:take])
+				mutatedSeed = mutatedSeed[take:]
+			} else if len(mutatedSeed) > 0 {
+				res += string(mutatedSeed)
+				mutatedSeed = nil
+			}
+
+			// If this segment has a count > what we put in, or if we want to add a separator
+			// from its charset after the seed word.
+			remMin := s.Min - take
+			if remMin < 0 {
+				remMin = 0
+			}
+			remMax := s.Max - take
+			if remMax < 0 {
+				remMax = 0
+			}
+
+			if remMax > 0 || s.Max < 0 {
+				// Chance to add a separator if the charset allows it
+				if strings.ContainsAny(s.Charset, "_#-$!@") {
+					prob, _ := GetRandIdx(10)
+					if prob < 4 { // 40% chance for a separator if segment allows
+						sepIdx, _ := GetRandIdx(int64(len(specChars)))
+						sep := specChars[sepIdx]
+						if strings.Contains(s.Charset, string(sep)) {
+							res += string(sep)
+						}
+					}
+				}
+				// If we still haven't met the Min length, fill with randoms
+				if remMin > 0 {
+					extra, _ := generateWithCharset(remMin, remMin, s.Charset)
+					res += extra
+				}
+			}
+		} else {
+			res += s.GenerateRandom()
+		}
+	}
+
+	// If seed wasn't fully consumed (rare with our regex), just prepend the rest
+	if len(mutatedSeed) > 0 {
+		res = string(mutatedSeed) + res
+	}
+
+	return res
+}
+
+func RandomizeCase(s string) string {
+	n, _ := GetRandIdx(10)
+	if n < 3 { // 30% All Lower
+		return strings.ToLower(s)
+	}
+	if n < 6 { // 30% Title Case
+		if len(s) > 0 {
+			return strings.ToUpper(s[:1]) + strings.ToLower(s[1:])
+		}
+		return s
+	}
+	if n < 7 { // 10% All Upper
+		return strings.ToUpper(s)
+	}
+
+	// 30% Random case (original behavior)
+	runes := []rune(s)
+	for i, r := range runes {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			rn, _ := GetRandIdx(2)
+			if rn == 0 {
+				runes[i] = []rune(strings.ToUpper(string(r)))[0]
+			} else {
+				runes[i] = []rune(strings.ToLower(string(r)))[0]
+			}
+		}
+	}
+	return string(runes)
+}
+
+func (s RegexSegment) GenerateRandom() string {
+	if len(s.Variants) > 0 {
+		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.Variants))))
+		return s.Variants[n.Int64()].GenerateRandom()
+	}
+	if s.Literal != "" {
+		return s.Literal
+	}
+	if s.Charset != "" {
+		res, _ := generateWithCharset(s.Min, s.Max, s.Charset)
+		return res
+	}
+	return ""
+}
+
+// RunSegmentedBrute executes exhaustive search for a given list of segments
+func RunSegmentedBrute(segments []RegexSegment, count int, prefix string, callback func(string)) {
+	generatedCount := 0
+
+	// We need to handle segment length variations (e.g. [a-z]{1,2})
+	// For each segment, we find all possible outputs
+	var allPosOutputs [][]string
+	for _, s := range segments {
+		allPosOutputs = append(allPosOutputs, s.Expand())
+	}
+
+	indices := make([]int, len(allPosOutputs))
+	for {
+		// Build string
+		res := prefix
+		for i, idx := range indices {
+			res += allPosOutputs[i][idx]
+		}
+		callback(res)
+		generatedCount++
+		if count > 0 && generatedCount >= count {
+			return
+		}
+
+		// Increment
+		for i := len(indices) - 1; i >= 0; i-- {
+			indices[i]++
+			if indices[i] < len(allPosOutputs[i]) {
+				goto next
+			}
+			indices[i] = 0
+			if i == 0 {
+				return
+			}
+		}
+	next:
+	}
+}
+
+func (s RegexSegment) Expand() []string {
+	if len(s.Variants) > 0 {
+		var res []string
+		for _, v := range s.Variants {
+			res = append(res, v.Expand()...)
+		}
+		return res
+	}
+	if s.Literal != "" {
+		return []string{s.Literal}
+	}
+	if s.Charset != "" {
+		var res []string
+		// Brute force expansion of charset combinations for small lengths
+		// If length is too large, this might be slow, but for NAS it's usually small segments
+		for l := s.Min; l <= s.Max; l++ {
+			it := NewSequentialIterator(s.Charset, l, l)
+			for {
+				p, ok := it.Next()
+				if !ok {
+					break
+				}
+				res = append(res, p)
+			}
+		}
+		return res
+	}
+	return []string{""}
+}
+
 // CalculateComplexity returns a score (lower is weaker/simpler).
 // Weakest: all lowercase, short.
 // Stronger: mixed case, numbers at end, special characters, longer.
@@ -339,6 +544,23 @@ func CalculateComplexity(p string) int {
 	}
 
 	return score
+}
+
+func (s RegexSegment) IsWordLike() bool {
+	if s.Literal != "" {
+		return true
+	}
+	if s.Charset == "" {
+		return false
+	}
+	letters := 0
+	for _, r := range s.Charset {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			letters++
+		}
+	}
+	// If more than 50% letters or specifically has alpha ranges
+	return letters > (len(s.Charset) / 2)
 }
 
 // ParseCharsetFromRegex extracts a flat charset from a simple [a-zA-Z] style regex
@@ -394,11 +616,19 @@ func ParseCharsetFromRegex(regex string) string {
 	return final
 }
 
-// ParseLengthsFromRegex extracts total {min,max} or {n} from a regex across all segments
+// ParseLengthsFromRegex extracts total {min,max} or [min-max] from a regex
 func ParseLengthsFromRegex(regex string) (int, int) {
+	// First check if there is a global length constraint at the end: [6-10] or {6,10}
+	globalRe := regexp.MustCompile(\`[\[\{](\d+)[-,\s](\d+)[\]\}]$\`)
+	if match := globalRe.FindStringSubmatch(regex); match != nil {
+		min, _ := strconv.Atoi(match[1])
+		max, _ := strconv.Atoi(match[2])
+		return min, max
+	}
+
 	segments := ParseSegmentedRegex(regex)
 	if len(segments) == 0 {
-		return 6, 10
+		return 6, 12 // Fallback to original default
 	}
 
 	totalMin, totalMax := 0, 0
@@ -411,41 +641,133 @@ func ParseLengthsFromRegex(regex string) (int, int) {
 
 // ParseSegmentedRegex splits a complex regex into individual segments
 func ParseSegmentedRegex(regex string) []RegexSegment {
-	// Matches like [a-z]{1,2} or [A-Z]
-	re := regexp.MustCompile(`\[([^\]]+)\](?:\{([^\}]*)\})?`)
-	matches := re.FindAllStringSubmatch(regex, -1)
+	// Strip global length constraint if present
+	regex = CleanRegex(regex)
+
+	// Strip outer wrapping parens if they exist for the whole thing
+	if strings.HasPrefix(regex, "(") && strings.HasSuffix(regex, ")") {
+		// Only strip if they don't have a quantifier after them (handled by CleanRegex already)
+		regex = regex[1 : len(regex)-1]
+	}
 
 	var segments []RegexSegment
-	for _, m := range matches {
-		charsetPart := "[" + m[1] + "]"
-		charset := ParseCharsetFromRegex(charsetPart)
-
-		min, max := 1, 1 // Default
-		if m[2] != "" {
-			parts := strings.Split(m[2], ",")
-			if len(parts) == 2 {
-				if parts[0] == "" {
-					min = 0
-				} else {
-					min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
-				}
-
-				if len(parts) > 1 && parts[1] != "" {
-					max, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
-				} else {
-					max = min
-				}
-			} else {
-				min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
-				max = min
+	i := 0
+	for i < len(regex) {
+		if regex[i] == '[' {
+			j := i
+			for j < len(regex) && regex[j] != ']' {
+				j++
 			}
+			if j < len(regex) {
+				segment := RegexSegment{Charset: ParseCharsetFromRegex(regex[i : j+1]), Min: 1, Max: 1}
+				i = j + 1
+				// Check for quantifier
+				i = parseQuantifier(regex, i, &segment)
+				segments = append(segments, segment)
+			} else {
+				i++
+			}
+		} else if regex[i] == '(' {
+			j := findClosingParen(regex, i)
+			if j != -1 {
+				content := regex[i+1 : j]
+				segment := parseGroup(content)
+				i = j + 1
+				i = parseQuantifier(regex, i, &segment)
+				segments = append(segments, segment)
+			} else {
+				i++
+			}
+		} else {
+			i++
 		}
-		segments = append(segments, RegexSegment{Charset: charset, Min: min, Max: max})
-	}
-	// If no segments found, return a default
-	if len(segments) == 0 {
-		// Try to fallback to the old simple search if it doesn't match [..] pattern
-		// but for now we expect [..]
 	}
 	return segments
+}
+
+func parseGroup(content string) RegexSegment {
+	if strings.Contains(content, "|") {
+		parts := strings.Split(content, "|")
+		var variants []RegexSegment
+		for _, p := range parts {
+			// Each part can be a literal or a sub-segment
+			if strings.HasPrefix(p, "[") {
+				sub := ParseSegmentedRegex(p)
+				if len(sub) > 0 {
+					variants = append(variants, sub[0])
+				}
+			} else {
+				variants = append(variants, RegexSegment{Literal: p})
+			}
+		}
+		return RegexSegment{Variants: variants}
+	}
+	// Not an alternation, just a group
+	sub := ParseSegmentedRegex(content)
+	if len(sub) == 1 {
+		return sub[0]
+	}
+	// Multiple segments in a group is tricky, let's just return a placeholder or handle it
+	return RegexSegment{Literal: content}
+}
+
+func parseQuantifier(regex string, i int, s *RegexSegment) int {
+	if i >= len(regex) {
+		return i
+	}
+	if regex[i] == '+' {
+		s.Min, s.Max = 1, 8
+		return i + 1
+	}
+	if regex[i] == '*' {
+		s.Min, s.Max = 0, 8
+		return i + 1
+	}
+	if regex[i] == '{' {
+		j := i
+		for j < len(regex) && regex[j] != '}' {
+			j++
+		}
+		if j < len(regex) {
+			parts := strings.Split(regex[i+1:j], ",")
+			if len(parts) == 2 {
+				if parts[0] == "" {
+					s.Min = 0
+				} else {
+					s.Min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+				}
+				if parts[1] != "" {
+					s.Max, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
+				} else {
+					s.Max = 12
+				}
+			} else {
+				s.Min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+				s.Max = s.Min
+			}
+			return j + 1
+		}
+	}
+	return i
+}
+
+func findClosingParen(s string, start int) int {
+	depth := 0
+	for i := start; i < len(s); i++ {
+		if s[i] == '(' {
+			depth++
+		} else if s[i] == ')' {
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// CleanRegex removes our custom global length constraints from a regex so it can be used with the standard regexp package
+func CleanRegex(regex string) string {
+	globalRe := regexp.MustCompile(\`[\[\{]\d+[-,\s]\d+[\]\}]$\`)
+	return globalRe.ReplaceAllString(regex, "")
 }

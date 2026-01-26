@@ -30,6 +30,8 @@ else
     echo "🗑️  Starting fresh session."
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
+    # Ensure any stray logs are also gone if we use a different persistence method later
+    rm -f ./*.log 
     SKIP_GEN=false
 fi
 LAN_IP=$(hostname -I | awk '{print $1}')
@@ -152,7 +154,7 @@ elif [ "$SMART_ONLY" = "true" ] && [ "$SKIP_GEN" = false ]; then
     echo "--- 🧠 Smart Mode: Generating human-pattern wordlist ---"
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
-    ./bin/hydra-gen -smart -n "$GEN_COUNT" > "$TEMP_DIR/smart_master.txt"
+    ./bin/hydra-gen -smart -n "$GEN_COUNT" -simfile "$BASE_PASS_FILE" > "$TEMP_DIR/smart_master.txt"
     split -n "l/$THREAD_COUNT" "$TEMP_DIR/smart_master.txt" "$TEMP_DIR/part_"
     for f in "$TEMP_DIR"/part_*; do mv "$f" "$f.txt"; done
 fi
@@ -172,7 +174,7 @@ T2_START=$(date +%s)
 pids_brute=()
 for f in "$TEMP_DIR"/part_*.txt; do
     if [ -f "$f" ]; then
-        ./bin/hydra-brute "$f" > "${f%.txt}.log" 2>&1 &
+        ./bin/hydra-brute "$f" >> "${f%.txt}.log" 2>&1 &
         pids_brute+=($!)
     fi
 done
