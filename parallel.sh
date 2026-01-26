@@ -4,7 +4,7 @@
 CONFIG_FILE=${1:-.env}
 if [ -f "$CONFIG_FILE" ]; then
     echo "📂 Loading configuration from $CONFIG_FILE"
-    set -a
+    set a
     . "$CONFIG_FILE"
     set +a
 elif [ "$CONFIG_FILE" != ".env" ]; then
@@ -167,7 +167,15 @@ if [ "$EXISTING_FILES" -eq 0 ]; then
     exit 1
 fi
 
-TOTAL_FOR_BRUTE=$(cat "$TEMP_DIR"/part_*.txt 2>/dev/null | wc -l)
+# Recalculate total for accurate progress (especially on resumes or smart/brute splits)
+# Use master files if they exist for precision, otherwise sum the parts
+if [ -f "$TEMP_DIR/smart_master.txt" ]; then
+    TOTAL_FOR_BRUTE=$(wc -l < "$TEMP_DIR/smart_master.txt")
+elif [ -f "$TEMP_DIR/brute_master.txt" ]; then
+    TOTAL_FOR_BRUTE=$(wc -l < "$TEMP_DIR/brute_master.txt")
+else
+    TOTAL_FOR_BRUTE=$(cat "$TEMP_DIR"/part_*.txt 2>/dev/null | wc -l)
+fi
 echo "🔥 Phase 2/2: Launching brute force ($TOTAL_FOR_BRUTE passwords)..."
 T2_START=$(date +%s)
 
@@ -253,13 +261,14 @@ else
     echo "📦 Generating $PHASE2_COUNT unique passwords sequentially from scratch (Exhaustive)..."
     
     ./bin/hydra-gen -n "$PHASE2_COUNT" -brute > "$TEMP_DIR/scratch_master.txt"
+    TOTAL_PHASE2=$(wc -l < "$TEMP_DIR/scratch_master.txt")
     
     # Split for parallel brute force
     split -n "l/$THREAD_COUNT" "$TEMP_DIR/scratch_master.txt" "$TEMP_DIR/part_"
     # Rename to .txt for the loop
     for f in "$TEMP_DIR"/part_*; do mv "$f" "$f.txt"; done
 
-    echo "🔥 Launching broad brute force..."
+    echo "🔥 Launching broad brute force ($TOTAL_PHASE2 passwords)..."
     pids_brute=()
     for f in "$TEMP_DIR"/part_*.txt; do
         ./bin/hydra-brute "$f" > "${f%.txt}.log" 2>&1 &
@@ -285,7 +294,7 @@ else
         fi
 
         tested_count=$(grep -c "Testing:" "$TEMP_DIR"/*.log 2>/dev/null | awk -F":" "{sum+=\$2} END {print sum+0}")
-        printf "\r\033[K   > Progress: %d/%d" "$tested_count" "$PHASE2_COUNT"
+        printf "\r\033[K   > Progress: %d/%d" "$tested_count" "$TOTAL_PHASE2"
         
         if [ "$still_running" -eq 0 ]; then break; fi
         sleep 1
